@@ -16,29 +16,22 @@ else {
 }
 ?>
 
-<!-- Pixel Code - //tongji.jihujiasuqi.com/ -->
-<!--<script defer src="https://tongji.jihujiasuqi.com/pixel/yMe9gPGIZKE7GZNu"></script>-->
-<!-- END Pixel Code -->
-
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  
-  <title>主页</title>
-  <link href="static/layui/css/layui.css" rel="stylesheet">
-  <link href="static/css/color_map.css?V1.0" rel="stylesheet"><!-- 颜色大全 -->
-  <link href="static/css/style.css?<?echo $debug;?>" rel="stylesheet">
-  
-  <style>
-  /* OEM_style */
-  <? echo $productdata["oem_css"]?>
-  /* OEM_style_END */
-  </style>
-  
-  
-  
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>主页</title>
+    <link href="static/layui/css/layui.css?<?echo $debug;?>" rel="stylesheet">
+    <link href="static/css/color_map.css?<?echo $debug;?>" rel="stylesheet"><!-- 颜色大全 -->
+    <link href="static/css/style.css?<?echo $debug;?>" rel="stylesheet">
+
+    <style>
+    /* OEM_style */
+    <? echo $productdata["oem_css"]?>
+    /* OEM_style_END */
+    </style>
 </head>
 <body class="home_page_body">
     <!--这里是拖拽区域-->
@@ -74,8 +67,8 @@ else {
                 <input type="text" name="username" value="" lay-verify="required" placeholder="搜索" lay-reqtext="搜索" autocomplete="off" class="layui-input no-outline" id="GamesearchInput" lay-affix="clear">
               </div>
             </div>
-            <div class="game_search_text ">
-                <p> <p/>
+            <div class="game_search_text">
+                <p> </p>
             </div>
             
             <div class="user_top_info">
@@ -97,8 +90,7 @@ else {
                     <button type="button" class="layui-btn layui-btn-disabled layui-btn-sm time2_bottom"  onclick="buy_time_page()">充值时长</button>
                 </div>
             </div>
-            
-            
+
             <!-- 加速器选项卡 -->
             <div class="layui-tab layui-tab-brief top-tab" lay-filter="top-tab">
               <ul class="layui-tab-title">
@@ -115,93 +107,56 @@ else {
             </div>
             
         </div>
-        
+        <!-- 首页 -->
         <div class="home_page app_page">
-            <!-- 首页游戏列表 -->
-            <div class="home_game_list">
-                <!-- 游戏列表 -->
-                <!--<div class="home_game_box">-->
-                <!--    <img src="/up_img/1ab6f8b64d2caf6a2dd6ccfe5954a186.png.webp" class="game_img">-->
-                <!--</div>-->
-                
-            </div>
-            
-            
-            <div class="home_game_list_all" id="home_game_list_all">
-                <!-- 首页全部游戏 -->
-            </div>
-            
-            
-            
-            <div class="home_carousel">
-                <!--1000X200-->
-                <!--<br>轮播图 JavaScript 未触发-->
-                <!--<br>class=home_carousel-->
-                <!--<br>该区域可自定义任何内容-->
-            </div>
-            
-            <!-- 右侧菜单 -->
-            <!--<div class="home_menu">-->
-                
-            <!--</div>-->
-            
-            
+            <!-- 首页的最最近4个游戏 -->
+            <div class="home_game_list"></div>
+            <!-- 向下滑动 -->
+            <div class="home_game_list_all" id="home_game_list_all"></div>
+
+            <!-- Ad 区 -->
+            <div class="home_carousel"></div>
         </div>
-        
-        
-        
+
         <div class="game_page app_page">
-            
-            <div class="layui-tab layui-tab-brief all-game-tab">
-              <!--<ul class="layui-tab-title">-->
-              <!--  <li class="layui-this">全部游戏</li>-->
-              <!--  <li>平台加速</li>-->
-              <!--  <li>主机加速</li>-->
-              <!--  <li>我的游戏</li>-->
-              <!--</ul>-->
-            </div>
-            
+            <div class="layui-tab layui-tab-brief all-game-tab"></div>
             <!-- 全部游戏列表 -->
             <div class="game_list_all">
-                
             </div>
         </div>
-        
+
         <div class="net_speed app_page">
-            
-            <!-- 加速列表 -->
+            <!-- TODO: 这是什么? 加速列表 -->
             <div class="net_speed_list">
                 <div class="layui-panel">
                     <div class="net_speed_list_box">面板任意内容</div>
                 </div>
             </div>
         </div>
-        
+        <!-- 加速游戏页面 -->
         <div class="start_game app_page">
+            <!-- 背景 -->
             <div class="game_img_bg">
                 <div class="MASK"></div>
-                <img src="/app_ui/pc/static/img/wallpapers.jpg" class="game_bg">
+                <img src="" class="game_bg">
                 
                 <video muted autoplay="autoplay"  class="game_bg_video" id="game_bg_video">
                 	<source src="" type="video/mp4"></source>
                 </video>
-                
-                
             </div>
             <div class="box">
-                <p class="gamename">gamename</p>
-                
+                <p class="gamename">游戏名称</p>
+                <!-- 平台加速 -->
                 <p class="pt_title">同时加速:</p>
                 <div class="pt_list">
                     <div class="pt_box" onclick="net_speed()">
                         <i class="layui-icon layui-icon-add-1" style="position: relative;top: 4px;left: -3px;font-size: 24px;margin-left: 0px;"></i> 
                     </div>
                 </div>
-                
-                
+
                 <div class="layui-panel info">
                   <div class="server_info">
-                      <p>xxx服务器</p>
+                      <p>服务器信息</p>
                       <img src="/app_ui/pc/static/img/udp-err.png" class="udp_ico">
                   </div>
                 </div>
@@ -215,7 +170,7 @@ else {
                           <p>游戏延迟</p>
                       </h2>
                       <h2 class="diubao">
-                          <Start_speed_diubao_html>0</Start_speed_diubao_html><mini>%</mini>
+                          <Start_speed_loss_html>0</Start_speed_loss_html><mini>%</mini>
                           <p>丢包率</p>
                       </h2>
                       <h2 class="outputBytes">
@@ -240,15 +195,13 @@ else {
                         <i class="layui-icon layui-icon-radio"></i> 
                         停止加速
                     </button>
-                    
-                    
-                    
-                    <button onclick="start_game_user();" type="button" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue start_game start_game_user" style="width: 157px;border-radius: 4px 0px 0px 4px;">
+
+                    <button id="start_game" type="button" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue start_game start_game_user" style="width: 157px;border-radius: 4px 0px 0px 4px;">
                         <i class="layui-icon layui-icon-release"></i> 
                         启动游戏
                     </button>
                     
-                    <button type="button"  onclick="ipcRenderer.send('user_get_exe');" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue start_game set_game_user" style="padding: 0 11px;margin-left: -5px;border-radius: 0px 4px 4px 0px;">
+                    <button type="button"  id="select_exe" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue start_game set_game_user" style="padding: 0 11px;margin-left: -5px;border-radius: 0px 4px 4px 0px;">
                         <i class="layui-icon layui-icon-set"></i> 
                     </button>
                     
@@ -267,9 +220,6 @@ else {
                 frameborder="no"
                 src="">
             </iframe>
-            
-            
-            
         </div>
         <!-- 用户设置 -->
         <div class="my_set app_page">
@@ -294,7 +244,7 @@ else {
                 <p class="username">获取用户名失败</p>
                 <p class="UID">UID 获取失败</p>
                 
-                <button class="layui-btn layui-btn-primary layui-border-red layui-btn-sm Logout" onclick="Logout();">退出登录</button>
+                <button class="layui-btn layui-btn-primary layui-border-red layui-btn-sm Logout" id="LogoutBtn">退出登录</button>
                 
             </div>
             <div class="sys_set my_set_page"  style="display: none;">
@@ -359,7 +309,7 @@ else {
                 <button type="button" class="layui-btn layui-btn-sm layui-btn-normal net_test">网络检测</button>
                 
             </div>
-            
+            <!-- TODO: ? -->
             <div class="iframe my_set_page"  style="display: none;">
                 <iframe
                     frameborder="no"
@@ -372,15 +322,12 @@ else {
         
         
         <div class="error_page app_page">
-            
             <h2 class="error_title">错误信息</h2>
             <textarea class="error_log layui-textarea" id="error_log" placeholder=" " readonly></textarea>
-            
-            
+            <!-- TODO: -->
             <div class="error_captcha" style="display: none;">
                 <div><button class="error_log_captcha_submit captcha_submit" type="button">提交</button></div>
             </div>
-            
         </div>
         
         

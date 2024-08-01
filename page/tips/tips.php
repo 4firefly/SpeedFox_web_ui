@@ -82,11 +82,11 @@ $.getJSON('https://api.jihujiasuqi.com/api/v2/?mode=get_oem&product=' + getUrlPa
     $('.logo').attr('src', data.logo);
 });
 
-// const {  ipcRenderer  } = require('electron');
+// const {  ipc  } = require('electron');
 // var window_data = []
 // window_data[0] = "tips"
 // window_data[1] = "show"
-// ipcRenderer.send('window', window_data);
+// ipc.send('window', window_data);
 
 
 setTimeout(function () { 

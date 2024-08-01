@@ -1,12 +1,17 @@
-const links = document.querySelectorAll('open_url[href]');
-links.forEach(link => {
-    link.addEventListener('click', e => {
-        const url = link.getAttribute('href');
-        e.preventDefault();
-        shell.openExternal(url);
-    });
+const { ipcRenderer: ipc, shell } = require('electron');
+const API_SERVER_ADDRESS = "https://api.jihujiasuqi.com";
+const SYS_JS_VERSION = 202406240430;
+// DEV ONLY
+$('.game_bg')[0].src = "https://api.jihujiasuqi.com/app_ui/pc/static/img/wallpapers.jpg";
+$('#start_game').on('click', function () {
+    start_game_user();
 });
-
+$('#select_exe').on('click', function () {
+    ipc.send('user_get_exe');
+});
+$('#LogoutBtn').on('click', function () {
+    Logout();
+});
 
 // 跳转到全部游戏或者切换回去
 function open_url(url) {
@@ -38,45 +43,17 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-
-// // 魔改log
-// // 保存原始的 console.log 函数
-// const originalConsoleLog = console.log;
-// // 重写 console.log 函数
-// console.log = function(...args) {
-//     // 获取当前本地时间的字符串
-//     ipcRenderer.send('web_log', ...args);
-//     originalConsoleLog.apply(console, [ ...args]);
-// };
-
-
-
 $(function() {
     $("[page='home']").trigger("click");
     // 向后端发送指令，告诉后端，可以关闭加载动画了
     setTimeout(() => {
-        var window_data =[]
-        window_data[0] = "ui"
-        window_data[1] = "show"
+        ipc.send('loadingWindow', 'hide');
         if(getUrlParams().silent != "true"){
-            ipcRenderer.send('window', window_data);
+            app_window('show');
         }
-        
-        window_data[0] = "load"
-        window_data[1] = "hide"
-        ipcRenderer.send('window', window_data);
-        
-        // 告诉后端可以加载托盘了
-        ipcRenderer.send('Tray', "show");
-        
-        
-        // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <marquee scrollamount='10'>当前是测试版本,请群内更新！&nbsp;&nbsp;&nbsp;&nbsp;</marquee>"});
-        
-        
-        
     }, 1000);
     // 清除host
-    ipcRenderer.send('batchRemoveHostRecords');
+    ipc.send('batchRemoveHostRecords');
     
     // 加载首页滚动图
     render_home() 
@@ -85,9 +62,9 @@ $(function() {
 
 
 // 接收主进程的消息
-ipcRenderer.on('Framework', (event, message) => {
+ipc.on('Framework', (event, message) => {
     Framework = message
-    ipcRenderer.send('speed_code_config', {"mode" : "taskkill"});
+    ipc.send('speed_code_config', {"mode" : "taskkill"});
     console.log('主线程发送信息:', Framework);
     console.log('基座版本:', Framework.version);
     
@@ -128,11 +105,11 @@ ipcRenderer.on('Framework', (event, message) => {
         dl_data(oem_config.up_url,content,"update_blob")
     }else{
         // 测试核心能不能用
-        ipcRenderer.send('speed_code_test');
+        ipc.send('speed_code_test');
     }
 });
 
-ipcRenderer.on('selected-file', (event, message) => {
+ipc.on('selected-file', (event, message) => {
     console.log('路径选择:',message[0] ,"游戏id" , gameconfig.id);
     
     if(message[0] == "undefined" || message[0] == undefined){
@@ -158,11 +135,11 @@ function start_game_user() {
     
     
     if(game_start == "undefined" || game_start == undefined){
-        ipcRenderer.send('user_get_exe');
+        ipc.send('user_get_exe');
         return; 
     }
     
-    ipcRenderer.send('user_start_exe',game_start);
+    ipc.send('user_start_exe',game_start);
     layer.tips('正在启动游戏！', '.start_game_user',{
         tips: [1,'#16b777']
       });
@@ -269,7 +246,7 @@ function moveLastToFirst(arr) {
     }
 
 // 接收主进程的消息
-ipcRenderer.on('checkUpdate_ipc', (event, message) => {
+ipc.on('checkUpdate_ipc', (event, message) => {
     console.log('更新信息:', message);
 });
 
@@ -281,7 +258,7 @@ var starttime_setInterval = null
 var speed_code_msg = null
 
 var speed_code_get_newdata = 0
-ipcRenderer.on('speed_code', (event, message) => {
+ipc.on('speed_code', (event, message) => {
     
   console.log('主线程发送信息:', message);
   
@@ -345,8 +322,8 @@ ipcRenderer.on('speed_code', (event, message) => {
             // 测试socks
             if(socks_test_lock == 0){
                 socks_test_lock = 1
-                ipcRenderer.send('speed_code_config', {"mode" : "socks_test"});
-                ipcRenderer.send('socks_connect_test');// 测试udp
+                ipc.send('speed_code_config', {"mode" : "socks_test"});
+                ipc.send('socks_connect_test');// 测试udp
                 socks_connect_test_ico_set()
                 socks_connect_test_data = []
             }
@@ -372,11 +349,11 @@ ipcRenderer.on('speed_code', (event, message) => {
                         console.log('加速id', speed_start_id);
                         
                         // 上升优先级
-                        ipcRenderer.send('high_priority', "sniproxy.exe");
-                        ipcRenderer.send('high_priority', "SpeedNet.exe");
-                        ipcRenderer.send('high_priority', "SpeedProxy.exe");
-                        ipcRenderer.send('high_priority', "SpeedMains.exe");
-                        ipcRenderer.send('high_priority', "SpeedFox.tun2socks.exe");
+                        ipc.send('high_priority', "sniproxy.exe");
+                        ipc.send('high_priority', "SpeedNet.exe");
+                        ipc.send('high_priority', "SpeedProxy.exe");
+                        ipc.send('high_priority', "SpeedMains.exe");
+                        ipc.send('high_priority', "SpeedFox.tun2socks.exe");
                         
                         
                         $("[start_gameid='"+Game_starting_id +"']").show();
@@ -428,22 +405,15 @@ ipcRenderer.on('speed_code', (event, message) => {
 
 
 // 关闭通信
-ipcRenderer.on('app_', (event, message) => {
+ipc.on('app_', (event, message) => {
     console.log(`参数: `,message)
     if(message == "exit"){
         app_exit()
     }
 });
 
-try {
-  const { ipcRenderer  } = require('electron');
-} catch (error) {
-  console.log("在错误的平台上运行" ,error);
-}
-
-
 // 返回ping数据
-ipcRenderer.on('ping-reply', (event, message) => {
+ipc.on('ping-reply', (event, message) => {
     // console.log(`参数: `,message)
     
     // 列表返回延迟
@@ -536,7 +506,7 @@ function Start_speed() {
             pingid: "ping_connect_server_test"
         };
         
-        ipcRenderer.send('ping',pingdata)
+        ipc.send('ping',pingdata)
         
         // ipcRenderer.send('NET_speed')// 更新流量
         
@@ -588,7 +558,7 @@ var up_userspeed = 5
 
 var Bandwidthspeed
 
-ipcRenderer.on('NET_speed-reply', (event, message) => {
+ipc.on('NET_speed-reply', (event, message) => {
     message = $.parseJSON(message);
     
     Bandwidthspeed = message
@@ -649,7 +619,7 @@ ipcRenderer.on('NET_speed-reply', (event, message) => {
 
 // 远程服务器
 var outputBytes_0_server = 0
-ipcRenderer.on('NET_speed_server-reply', (event, message) => {
+ipc.on('NET_speed_server-reply', (event, message) => {
     // console.log('NET_speed-reply:', message);
     // 按行拆分指标文本
     var lines = message.split('\n');
@@ -731,7 +701,7 @@ function Start_speed_ping(message) {
         let lossCount = latest100.filter(num => num > 3000).length;
         
         
-        if($("Start_speed_diubao_html").text() != lossCount){
+        if($("Start_speed_loss_html").text() != lossCount){
             console.log('loss出现变化:', lossCount);
             if(lossCount > 1){
                 console.log('loss大于1:', lossCount);
@@ -766,7 +736,7 @@ function Start_speed_ping(message) {
             
         }
         
-        $("Start_speed_diubao_html").text(lossCount)
+        $("Start_speed_loss_html").text(lossCount)
         
         
         
@@ -867,7 +837,7 @@ function app_exit() {
 
 // 窗口操作
 function app_window(mode) {
-    ipcRenderer.send('window', ["ui",mode]);
+    ipc.send('mainWindow', mode);
 }
 
 
@@ -1000,7 +970,7 @@ function set_speed_code_config(gameid,serverid,mode) {
     Game_start_animation(gameid)
     
 
-    ipcRenderer.send('speed_code_config', {"mode" : "taskkill"});
+    ipc.send('speed_code_config', {"mode" : "taskkill"});
     
     starttime_timeout = 0;
     starttime_setInterval = setInterval(function() {
@@ -1078,7 +1048,7 @@ function set_speed_code_config(gameid,serverid,mode) {
             "v2config":v2config,
         };
         
-        ipcRenderer.send('speed_code_config', start_config);
+        ipc.send('speed_code_config', start_config);
         
         
         gamebg = ""
@@ -1117,14 +1087,14 @@ function set_speed_code_config(gameid,serverid,mode) {
     }, 1000 * .5);
 }
 // 写入游戏配置检测
-ipcRenderer.on('speed_code_config-reply', (event, message) => {
+ipc.on('speed_code_config-reply', (event, message) => {
     if(message == "OK"){
         console.log(`游戏配置准备就绪 `)
     }
 });
 
 var speed_code_test_mode = 0
-ipcRenderer.on('speed_code_test', (event, message) => {
+ipc.on('speed_code_test', (event, message) => {
     console.log(`环境检测 `,message)
     if(speed_code_test_mode == 0){
         console.log(`环境检测 `,message)
@@ -1167,20 +1137,20 @@ ipcRenderer.on('speed_code_test', (event, message) => {
 
 
 var socks_connect_test_data = []
-ipcRenderer.on('socks_connect_test', (event, message) => {
+ipc.on('socks_connect_test', (event, message) => {
     console.log(`连接检测 `,message)
     
     if(message.includes("UDP: OK")){
         console.log(`UDP 连接正常 `)
         layer.msg('UDP 连接正常', {offset: 'b',anim: 'slideUp'});
-        ipcRenderer.send('web_log', `UDP 连接正常 `);
+        ipc.send('web_log', `UDP 连接正常 `);
         socks_connect_test_data.udp = true
     }
     
     if(message.includes("TCP: OK")){
         console.log(`TCP 连接正常 `)
         layer.msg('TCP 连接正常', {offset: 'b',anim: 'slideUp'});
-        ipcRenderer.send('web_log', `TCP 连接正常 `);
+        ipc.send('web_log', `TCP 连接正常 `);
         socks_connect_test_data.TCP = true
     }
     
@@ -1190,14 +1160,14 @@ ipcRenderer.on('socks_connect_test', (event, message) => {
 
 function socks_connect_test_ico_set() {
     if(socks_connect_test_data.TCP && socks_connect_test_data.udp){
-        $('.start_game .box .server_info .udp_ico').attr('src', '/app_ui/pc/static/img/nettestok.png');
+        $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
     }else{
-        $('.start_game .box .server_info .udp_ico').attr('src', '/app_ui/pc/static/img/nettesterr.png');
+        $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
     }
 }
 
 $(".start_game .box .server_info .udp_ico").on('click', function(event) {
-    ipcRenderer.send('socks_connect_test');// 测试udp
+    ipc.send('socks_connect_test');// 测试udp
     socks_connect_test_data=[]
     socks_connect_test_ico_set()
 });
@@ -1212,7 +1182,7 @@ function info_speed() {
 
 function stop_speed() {
     console.log(`停止加速 `)
-    ipcRenderer.send('speed_code_config', {"mode" : "taskkill"});
+    ipc.send('speed_code_config', {"mode" : "taskkill"});
     
     console.log('确认一下 Game_starting_id :', Game_starting_id);
     console.log('确认一下 Game_start_id :', Game_start_id);
@@ -1250,7 +1220,7 @@ function stop_speed() {
     net_speed_json.forEach(service => {
             service.start = 0;
     });
-    ipcRenderer.send('batchRemoveHostRecords');
+    ipc.send('batchRemoveHostRecords');
 }
 
 
@@ -1343,7 +1313,7 @@ function Loaded_Game_home(all_game , i , history_id){
             $(".home_game_list").append(`
                 <div class="home_game_box">
                     <div class="box_a">
-                        <img src="/up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
+                        <img src="${API_SERVER_ADDRESS}/up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
                         
                         <div class="top">
                             <div class="icon">
@@ -1404,7 +1374,7 @@ function Loaded_Game_home_all(all_game , i , history_id){
         $(".home_game_list_all").append(`
                 <div class="home_game_box home_game_box_all">
                     <div class="box_a">
-                        <img src="/up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
+                        <img src=${API_SERVER_ADDRESS}up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
                         
                         <div class="top">
                             <div class="icon">
@@ -1456,7 +1426,7 @@ function Loaded_Game_list(all_game){
         $(".game_list_all").append(`
             <div class="home_game_box" gameid="` + field.id + `" onclick="Game_start(` + field.id + `,2);" >
                 <div class="box_a">
-                    <img src="/up_img/` + field.img + `.webp?gameid=` + field.id + `" class="game_img" loading="lazy">
+                    <img src="${API_SERVER_ADDRESS}/up_img/` + field.img + `.webp?gameid=` + field.id + `" class="game_img" loading="lazy">
                     
                     <!--
                     <div class="top">
@@ -1487,7 +1457,7 @@ function Loaded_Game_home_nogame (a){
     $(".home_game_list").append(`
         <div class="home_game_box nogame">
             <div class="box_a">
-                <img src="/up_img/apex.png.webp" class="game_img" >
+                <img src="${API_SERVER_ADDRESS}/up_img/apex.png.webp" class="game_img" >
                 
                 <div class="top_nogame">
                    <img src="static/img/fox_avater.png" class="top_nogame_img" >
@@ -1586,7 +1556,7 @@ function Game_history(){
         $(".home_game_list_all").append(`
          <div class="home_game_box nogame" style="opacity: 0.0;height: 285px;">
             <div class="box_a">
-                <img src="/up_img/apex.png.webp" class="game_img" >
+                <img src="${API_SERVER_ADDRESS}/up_img/apex.png.webp" class="game_img" >
                 
                 <div class="top_nogame">
                    <img src="static/img/fox_avater.png" class="top_nogame_img" >
@@ -2137,7 +2107,7 @@ function server_list_all(sort) {
                       host: field.test_ip + ":" + field.test_port,
                       pingid: "ping_server_list"
                   };
-                ipcRenderer.send('ping',pingdata)
+                ipc.send('ping',pingdata)
             })
         },1000 * .5)
         
@@ -2546,20 +2516,20 @@ function error_page(data) {
     
     
     
-    ipcRenderer.send('speed_code_config', {"mode" : "log"});
+    ipc.send('speed_code_config', {"mode" : "log"});
     layer.msg('正在抓取错误...', {icon: 16,shade: 0.01});;
-    ipcRenderer.send('web_log', `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`);
-    ipcRenderer.send('web_log', `[出现错误] 故障时间:` + new Date());
-    ipcRenderer.send('web_log', `[出现错误] 初步诊断原因:` + data);
-    ipcRenderer.send('web_log', `[出现错误] 服务器 Name:` + Server_config.name);
-    ipcRenderer.send('web_log', `[出现错误] 服务器 ID:` + Server_config.id);
+    ipc.send('web_log', `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`);
+    ipc.send('web_log', `[出现错误] 故障时间:` + new Date());
+    ipc.send('web_log', `[出现错误] 初步诊断原因:` + data);
+    ipc.send('web_log', `[出现错误] 服务器 Name:` + Server_config.name);
+    ipc.send('web_log', `[出现错误] 服务器 ID:` + Server_config.id);
     
-    ipcRenderer.send('web_log', `[出现错误] 加速游戏 NAME:` + Game_code_config.name);
-    ipcRenderer.send('web_log', `[出现错误] 加速游戏 ID:` + Game_code_config.id);
+    ipc.send('web_log', `[出现错误] 加速游戏 NAME:` + Game_code_config.name);
+    ipc.send('web_log', `[出现错误] 加速游戏 ID:` + Game_code_config.id);
     
-    ipcRenderer.send('web_log', `[出现错误] 用户 ID:` + user_info_data.id);
-    ipcRenderer.send('web_log', `[出现错误] userAgent:` + navigator.userAgent);
-    ipcRenderer.send('web_log', `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`);
+    ipc.send('web_log', `[出现错误] 用户 ID:` + user_info_data.id);
+    ipc.send('web_log', `[出现错误] userAgent:` + navigator.userAgent);
+    ipc.send('web_log', `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`);
     
     
     stop_speed()
@@ -2719,7 +2689,7 @@ function dl_data(inurl,content1,datafile) {
                 
                 
                 if(datafile == "update_blob"){
-                    ipcRenderer.send('update_blob', arrayBuffer);
+                    ipc.send('update_blob', arrayBuffer);
                     
                     
                     
@@ -2749,13 +2719,13 @@ function dl_data(inurl,content1,datafile) {
                     
                 }
                 if(datafile == "NET_blob"){
-                    ipcRenderer.send('NET_blob', arrayBuffer);
+                    ipc.send('NET_blob', arrayBuffer);
                     speed_code_test_mode = 2
                     
                     var t2 = window.setInterval(function() {
                     	if(fake_percentComplete > 99){
                     	    window.clearInterval(t2)  // 去除定时器
-                    	    ipcRenderer.send('speed_code_test');
+                    	    ipc.send('speed_code_test');
                             
                     	}else{
                     	    fake_percentComplete ++
@@ -2953,15 +2923,15 @@ function net_speed_set(mode,open){
 function net_speed_set_start(open){
     
     // 先删老host
-    ipcRenderer.send('batchRemoveHostRecords');
+    ipc.send('batchRemoveHostRecords');
     
     
     // 启动平台加速网络
     //ws://ws1.cloudflare.foxcloud.asia:8080?path=/ws
-    ipcRenderer.send('host_speed_start', {"f" : "ws://ws1.cloudflare.foxcloud.asia:8080?path=/ws"}); 
+    ipc.send('host_speed_start', {"f" : "ws://ws1.cloudflare.foxcloud.asia:8080?path=/ws"});
     
     // 启动host服务器
-    ipcRenderer.send('speed_code_config', {"mode" : "sniproxy"});
+    ipc.send('speed_code_config', {"mode" : "sniproxy"});
     
     // 测试socks
      var socks_test  =
@@ -2969,7 +2939,7 @@ function net_speed_set_start(open){
             "tag" : "net_speed_start",
             "server" : "127.114.233.8:16789",
         };
-    ipcRenderer.send('socks_test', socks_test); 
+    ipc.send('socks_test', socks_test);
     
     host = ""
     $(".start_game .box .pt_list").html("") // 清除加速页面已同时加速的列表
@@ -3002,7 +2972,7 @@ function net_speed_set_start(open){
     if(host_dataArray.length == 0 || host_dataArray[0] == ""){
         console.log('无host可配置',host_dataArray.length);
         // 删老host
-        ipcRenderer.send('batchRemoveHostRecords');
+        ipc.send('batchRemoveHostRecords');
         return;
     }
     console.log('需要配置的host',host_dataArray,"数量",host_dataArray.length);
@@ -3011,7 +2981,7 @@ function net_speed_set_start(open){
                 { ip: '0.0.0.0', hostname:"www.youtube.com"},
                 { ip: '0.0.0.0', hostname:"youtube.com"},
             ];
-    ipcRenderer.send('batchAddHostRecords',hostrecordsToAdd);
+    ipc.send('batchAddHostRecords',hostrecordsToAdd);
     
     
     const hostrecordsToAdd_host = [];
@@ -3022,9 +2992,9 @@ function net_speed_set_start(open){
         hostrecordsToAdd_host.push({ ip: '127.114.233.8', hostname: service });
     });
     
-    ipcRenderer.send('batchAddHostRecords',hostrecordsToAdd_host);
+    ipc.send('batchAddHostRecords',hostrecordsToAdd_host);
     
-    ipcRenderer.send('high_priority', "sniproxy.exe");
+    ipc.send('high_priority', "sniproxy.exe");
 }
 
 
@@ -3075,13 +3045,13 @@ $(".my_set [page='iframe_aff']").on('click', function(event) {
 });
 
 $(".my_set [page='iframe_kl']").on('click', function(event) {
-    $(".my_set .iframe iframe").attr('src','/admin/website/news_list?type=1')
+    $(".my_set .iframe iframe").attr('src',API_SERVER_ADDRESS+'/admin/website/news_list?type=1')
     $(".my_set .my_set_page").hide();
     $(".my_set .iframe").show();
 });
 
 $(".my_set [page='iframe_key']").on('click', function(event) {
-    $(".my_set .iframe iframe").attr('src','/admin/website/news_list?type=1')
+    $(".my_set .iframe iframe").attr('src',API_SERVER_ADDRESS+'/admin/website/news_list?type=1')
     $(".my_set .my_set_page").hide();
     $(".my_set .iframe").show();
 });
@@ -3093,7 +3063,7 @@ $(".my_set [page='iframe_agent']").on('click', function(event) {
 });
 
 $(".my_set [page='iframe_Details']").on('click', function(event) {
-    $(".my_set .iframe iframe").attr('src','/admin/website/news_list?type=1')
+    $(".my_set .iframe iframe").attr('src',API_SERVER_ADDRESS+'/admin/website/news_list?type=1')
     $(".my_set .my_set_page").hide();
     $(".my_set .iframe").show();
 });
@@ -3137,16 +3107,16 @@ $(".my_set_page .reset_lsp").on('click', function(event) {
 
 $(".my_set_page .reset_nf2").on('click', function(event) {
     app_fix(".my_set_page .reset_nf2")
-        ipcRenderer.send('speed_code_config_exe', "nf2_install");
+        ipc.send('speed_code_config_exe', "nf2_install");
 });
 
 $(".my_set_page .reset_tun").on('click', function(event) {
     app_fix(".my_set_page .reset_tun")
-        ipcRenderer.send('speed_code_config_exe', "wintun_install");
+        ipc.send('speed_code_config_exe', "wintun_install");
 });
 
 $(".my_set_page .net_test").on('click', function(event) {
-    ipcRenderer.send('test_baidu');
+    ipc.send('test_baidu');
 });
 
 
@@ -3176,7 +3146,7 @@ function app_fix(css){
             fix_schedule = 0
             clearInterval(fix_timer);//清除定时器
             $(css).text("修复完成")
-            ipcRenderer.send('speed_code_config', {"mode" : "taskkill"});
+            ipc.send('speed_code_config', {"mode" : "taskkill"});
         }
     }, 10);
 }
