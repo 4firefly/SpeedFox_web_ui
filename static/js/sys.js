@@ -1,6 +1,3 @@
-const {  ipcRenderer , shell  } = require('electron');
-
-
 const links = document.querySelectorAll('open_url[href]');
 links.forEach(link => {
     link.addEventListener('click', e => {
@@ -1024,7 +1021,7 @@ function set_speed_code_config(gameid,serverid,mode) {
     
     
     setTimeout(() => {
-        Server_config = get_JSON("/api/v2/?mode=server_info&product=" + getUrlParams().product + "&sid="+serverid+"&user_code=" + user_code())
+        Server_config = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_info&product=" + getUrlParams().product + "&sid="+serverid+"&user_code=" + user_code())
         console.log("服务器配置",Server_config); 
         
         localStorage.setItem('server_sort_' + Game_code_config.id, Server_config.CountryCode);
@@ -1086,9 +1083,9 @@ function set_speed_code_config(gameid,serverid,mode) {
         
         gamebg = ""
         if(Game_code_config.wallpapers == "noset"){
-            gamebg =  '/up_img/' + Game_code_config.img + ".webp"
+            gamebg =  API_SERVER_ADDRESS+'/up_img/' + Game_code_config.img + ".webp"
         }else{
-            gamebg = "/up_img/wallpapers/" + Game_code_config.wallpapers
+            gamebg = API_SERVER_ADDRESS+"/up_img/wallpapers/" + Game_code_config.wallpapers
         }
         
         
@@ -1295,12 +1292,12 @@ if(getUrlParams().demo_watermark){
 // });
 
 
-var oem_config  = get_JSON("/api/v2/?mode=get_oem&product=" + getUrlParams().product)
+var oem_config  = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=get_oem&product=" + getUrlParams().product)
 $('.nav .logo').attr('src', oem_config.logo);
 console.log("oem信息",oem_config);
 
 
-var Game_list_json = get_JSON("/api/v2/?mode=game_list&product=" + getUrlParams().product)
+var Game_list_json = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=game_list&product=" + getUrlParams().product)
 Loaded_Game_list(Game_list_json); // 装载游戏列表
 
 
@@ -1527,7 +1524,7 @@ $('.user_top_info').mouseover(function(){
 var user_info_data = ""
 // 获取用户信息
 function Game_user_info(){
-    $.getJSON("/api/v2/?mode=user_info&user_code=" + user_code() + "&product=" + getUrlParams().product).done(function(data) {
+    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=user_info&user_code=" + user_code() + "&product=" + getUrlParams().product).done(function(data) {
       console.log("用户信息" , data);
       user_info_data = data
 
@@ -1920,7 +1917,7 @@ function Server_list(gameid){
     
     var tmp_gameid = gameid
     // 写入加速配置
-    $.getJSON("/api/v2/?mode=game_config&product=" + getUrlParams().product + "&id="+gameid+"&user_code=" + user_code()).done(function(data) {
+    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=game_config&product=" + getUrlParams().product + "&id="+gameid+"&user_code=" + user_code()).done(function(data) {
         Game_code_config = data
         console.log("游戏加速配置",Game_code_config); 
         
@@ -1929,7 +1926,7 @@ function Server_list(gameid){
         // 加载服务器列表
         
             // 获取服务器列表
-        $.getJSON("/api/v2/?mode=server_sort&user_code="+user_code()+"&product=" + getUrlParams().product).done(function(data) {
+        $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_sort&user_code="+user_code()+"&product=" + getUrlParams().product).done(function(data) {
             // 请求成功时的处理逻辑
             console.log("服务器地区请求成功" , data);
             $("[page='server_sort']").trigger("click");
@@ -2041,7 +2038,7 @@ function server_list_all(sort) {
     server_list_layui()// 渲染列表
     $("[page='server_list']").trigger("click");
     
-    $.getJSON("/api/v2/?mode=server_list&user_code="+ user_code() +"&product=" + getUrlParams().product + "&CountryCode=" + sort).done(function(data) {
+    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_list&user_code="+ user_code() +"&product=" + getUrlParams().product + "&CountryCode=" + sort).done(function(data) {
         // 请求成功时的处理逻辑
         serverlist_config = data
         
@@ -2807,7 +2804,7 @@ function dl_data(inurl,content1,datafile) {
 
 
 // 加速平台
-$.getJSON("/api/v2/?mode=host_speed&user_code="+ user_code()).done(function(data) {
+$.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=host_speed&user_code="+ user_code()).done(function(data) {
     net_speed_json = data
     // 批量吧所有配置设置成0
     net_speed_json.forEach(service => {
