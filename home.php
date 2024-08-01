@@ -403,8 +403,9 @@ else {
     // oem_js
   <? echo $productdata["oem_js"]?>
   </script>
-  <script src="static/js/sys.js?<?echo $debug;?>"></script>
   <script src="static/js/constants.js?<?echo $debug;?>"></script>
+  <script src="static/js/sys.js?<?echo $debug;?>"></script>
+  
   <script src="static/js/script.js?<?echo $debug;?>"></script>
   
   <script src="/apps/captcha2/dist/captcha.js"></script> 
