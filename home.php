@@ -1,10 +1,19 @@
 <?
-$debug = time();// 预防js和css缓存
-require_once('../../api/System.php');
-$product = $_GET['product'];
-$productdata= mysqli_query($conn,"select * from oem where name = '$product'");
-$productdata = mysqli_fetch_assoc($productdata);
+$debug = time();
+$TEST_ENVIRONMENT = true;
 
+if (!$TEST_ENVIRONMENT) {
+    require_once('../../api/System.php');
+    $product     = $_GET['product'];
+    $productdata = mysqli_query($conn,"select * from oem where name = '$product'");
+    $productdata = mysqli_fetch_assoc($productdata);
+}
+else {
+    $productdata = array(
+        "oem_css" => "",
+        "oem_js" => ""
+    );
+}
 ?>
 
 <!-- Pixel Code - //tongji.jihujiasuqi.com/ -->
