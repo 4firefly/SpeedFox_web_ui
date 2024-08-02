@@ -297,7 +297,7 @@ $debug = time();// 预防js和css缓存
     
     $("gamename").html(getUrlParams().name);
     
-    var server_delayData = []; // 初始为空数组
+    var serverDelayData = []; // 初始为空数组
     var server_list_R = 0
 
     function getUrlParams() {
@@ -324,56 +324,56 @@ $debug = time();// 预防js和css缓存
         $.each(data, function(i, field){
             $(".all_server").append(`
                 
-                <button type="button" class="layui-btn layui-btn-normal" id="server_sort_`+field.id+`" onclick="server_list('` + field.CountryCode + `');"><img src="../../static/img/Flag/`+field.Flag.toLowerCase()+`.png" class="Flag"><p>` +field.name +`</p></button>
+                <button type="button" class="layui-btn layui-btn-normal" id="last_region_`+field.id+`" onclick="server_list('` + field.CountryCode + `');"><img src="../../static/img/Flag/`+field.Flag.toLowerCase()+`.png" class="Flag"><p>` +field.name +`</p></button>
                 
             `);
         })
         // layer.close(loadIndex)
         
         // 自动选择服务器
-        var server_sort_pageStates = localStorage.getItem('server_sort_' + gameid);
-        if(server_sort_pageStates){
-            console.log("上次选择的服务器" , server_sort_pageStates);
-            server_list(server_sort_pageStates)
+        var last_region_pageStates = localStorage.getItem('last_region_' + gameid);
+        if(last_region_pageStates){
+            console.log("上次选择的服务器" , last_region_pageStates);
+            server_list(last_region_pageStates)
         }
         
     })
     .fail(function(xhr, status, error) {
       // 请求失败时的处理逻辑
-        localStorage.removeItem('server_sort_' + gameid);
+        localStorage.removeItem('last_region_' + gameid);
         console.log("请求失败" + error,status,xhr);
         layer.msg('数据请求失败 <br>返回码:' + xhr.status);
     });
     
-    var serverlist_config = null ;
+    var currentRegionServerList = null ;
     let pingloop
     
     function server_list(sort) {
         $(".server_list .tablelist").hide()
         $(".server_list .serverload").show()
-        serverlist_config = []; // 清空列表
-        server_delayData = [] // 清空测试历史延迟
-        server_list_layui()// 渲染列表
+        currentRegionServerList = []; // 清空列表
+        serverDelayData = [] // 清空测试历史延迟
+        renderServerList()// 渲染列表
         $("[page='server_list']").trigger("click");
         
         $.getJSON("/api/v2/?mode=server_list&user_code="+getUrlParams().user_code+"&product=" + getUrlParams().product + "&CountryCode=" + sort)
         .done(function(data) {
             // 请求成功时的处理逻辑
-            serverlist_config = data
-            // console.log("服务器列表请求成功" , serverlist_config);
-            if(!serverlist_config){
+            currentRegionServerList = data
+            // console.log("服务器列表请求成功" , currentRegionServerList);
+            if(!currentRegionServerList){
                 $("[page='server_sort']").trigger("click");
                 layer.msg('当前地区服务器获取失败');
             }
             
-            localStorage.setItem('server_sort_' + gameid, sort);
+            localStorage.setItem('last_region_' + gameid, sort);
             
             
             // 修改所有对象的name字段
-            serverlist_config.forEach(function(item) {
+            currentRegionServerList.forEach(function(item) {
                 item.name += "-" + item.id; // 将id值添加到name字段后面
                 item.ping = "<p class='server_ms'>测速中</p>";
-                item.netok= `<netok> <canvas id="networkDelayCanvas_`+item.test_ip+`"  width="162" height="32"></canvas> </netok>`;
+                item.netok= `<netok> <canvas id="serverDelayCanvas_`+item.test_ip+`"  width="162" height="32"></canvas> </netok>`;
                 
                 if(item.tag == "official"){
                     item.tag = `
@@ -415,10 +415,10 @@ $debug = time();// 预防js和css缓存
             })
             server_list_R = server_list_R
             
-            server_list_layui()// 渲染列表
+            renderServerList()// 渲染列表
             
             try {
-              window.clearInterval(loop_net_test)  // 去除定时器
+              window.clearInterval(LatencyTestInterval)  // 去除定时器
             } catch (error) {
               console.log("可能没定时器" ,error);
             }
@@ -427,7 +427,7 @@ $debug = time();// 预防js和css缓存
             
             
             var test_list_speed = 0.5 // 测试速度
-            var loop_net_test = window.setInterval(function() {
+            var LatencyTestInterval = window.setInterval(function() {
             	$.each(data, function(i, field){
                     // 稀里哗啦先把数据先甩给父页面，父页面甩给后端
                     const pingdata = {
@@ -450,7 +450,7 @@ $debug = time();// 预防js和css缓存
             
             // 降速继续测30秒
             setTimeout(function() {
-                window.clearInterval(loop_net_test)  // 去除定时器
+                window.clearInterval(LatencyTestInterval)  // 去除定时器
                  console.log('停止测试:');
             },1000 * 16)
             // servertestoklist = []
@@ -469,7 +469,7 @@ $debug = time();// 预防js和css缓存
             //                     // console.log(`服务器可见` , ip);
             //                     servertestoklist.push(ip)
                                 
-            //                     // networkDelayCanvas_iptest(ip)
+            //                     // serverDelayCanvas_iptest(ip)
             //                 } else {
             //                     let index = servertestoklist.indexOf(ip); // 找到值为5的索引
             //                     if (index !== -1) { // 确保找到了要删除的值
@@ -513,7 +513,7 @@ $debug = time();// 预防js和css缓存
             // console.log('返回:', event.data);
             
             // 找到目标对象并插入数据
-            serverlist_config.forEach(function(item) {
+            currentRegionServerList.forEach(function(item) {
                 if (item.test_ip === event.data.res.host) {
                     if(event.data.res.time == "unknown"){
                         event.data.res.time = 9999
@@ -524,20 +524,20 @@ $debug = time();// 预防js和css缓存
             });
             
             
-            // console.log('返回:', serverlist_config);
+            // console.log('返回:', currentRegionServerList);
             // 第一次测试也写进去
             updateDelayData(event.data.res.host, event.data.res.time);
             
             
             if(server_list_R < 0){
                 // 刷新列表
-                server_list_layui()
+                renderServerList()
                 server_list_R++
                 // console.log('刷新列表次数:',server_list_R);
                 $(".server_list .tablelist").hide()
                 $(".server_list .serverload").show()
             }else{
-                networkDelayCanvas_update(event.data.res.host) // 绘制数据
+                updateServerDelayData(event.data.res.host) // 绘制数据
                 setTimeout(() => {
                     $(".server_list .tablelist").show()
                     $(".server_list .serverload").hide()
@@ -554,7 +554,7 @@ $debug = time();// 预防js和css缓存
     
     // 页面切换
     $("[page='server_list']").on('click', function(event) {
-        if(!serverlist_config){
+        if(!currentRegionServerList){
             layer.msg('请先选择区服');
             setTimeout(() => { 
                 $("[page='server_sort']").trigger("click");
@@ -582,7 +582,7 @@ $debug = time();// 预防js和css缓存
     
     `
     
-    function server_list_layui() {
+    function renderServerList() {
             // 渲染数据
             layui.use('table', function(){
               var table = layui.table;
@@ -597,7 +597,7 @@ $debug = time();// 预防js和css缓存
                   {field: 'ping', title: '延迟',sort: false},
                   
                 ]],
-                data: serverlist_config ,
+                data: currentRegionServerList ,
                 height: 310,
                 width: 630,
                 escape: false, // 不开启 HTML 编码
@@ -638,7 +638,7 @@ $debug = time();// 预防js和css缓存
             // 渲染结束
     }
     
-    function networkDelayCanvas_iptest(ip) {
+    function serverDelayCanvas_iptest(ip) {
         const pingdata1 = {
               mode:"ping_server_list_Canvas",
               host: ip
@@ -650,13 +650,13 @@ $debug = time();// 预防js和css缓存
     
     function updateDelayData(ip, delay) {
         // 检查是否存在对应的 IP 地址
-        var existingEntry = server_delayData.find(function(entry) {
+        var existingEntry = serverDelayData.find(function(entry) {
             return entry.ip === ip;
         });
     
         // 如果不存在，创建一个新的对象
         if (!existingEntry) {
-            server_delayData.push({
+            serverDelayData.push({
                 ip: ip,
                 delays: [delay]
             });
@@ -668,17 +668,17 @@ $debug = time();// 预防js和css缓存
     
     function getDelaysByIp(ip) {
         // 查找匹配的 IP 地址
-        var entry = server_delayData.find(function(entry) {
+        var entry = serverDelayData.find(function(entry) {
             return entry.ip === ip;
         });
     
         // 如果找到匹配的条目，则返回延迟数组，否则返回 null
         return entry ? entry.delays : null;
     }
-    function networkDelayCanvas_update(ip) {
-        // networkDelayCanvas_
+    function updateServerDelayData(ip) {
+        // serverDelayCanvas_
         // 获取Canvas元素
-        var canvas = document.getElementById('networkDelayCanvas_' + ip);
+        var canvas = document.getElementById('serverDelayCanvas_' + ip);
         var ctx = canvas.getContext('2d');
 
         // 定义一些参数
@@ -728,10 +728,10 @@ $debug = time();// 预防js和css缓存
     // 全局鼠标检测
     $("body").on('click', function(event) {
         //点击循环添加服务器
-        if(serverlist_config != null){
-            serverlist_config.forEach(function(item) {
+        if(currentRegionServerList != null){
+            currentRegionServerList.forEach(function(item) {
                 // console.log('返回:', item);
-                networkDelayCanvas_update(item.test_ip) // 绘制数据
+                updateServerDelayData(item.test_ip) // 绘制数据
             });
         }
         

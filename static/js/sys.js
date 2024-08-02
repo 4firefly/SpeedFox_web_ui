@@ -1,25 +1,6 @@
 const { ipcRenderer: ipc, shell } = require('electron');
 const API_SERVER_ADDRESS = "https://api.jihujiasuqi.com";
 const SYS_JS_VERSION = 202406240430;
-// DEV ONLY
-$('.game_bg')[0].src = "https://api.jihujiasuqi.com/app_ui/pc/static/img/wallpapers.jpg";
-$('#start_game').on('click', function () {
-    start_game_user();
-});
-$('#select_exe').on('click', function () {
-    ipc.send('user_get_exe');
-});
-$('#LogoutBtn').on('click', function () {
-    Logout();
-});
-
-/*
-* 外部打开 url
-* url: 需要打开的 url
-* */
-function open_url(url) {
-    shell.openExternal(url);
-}
 
 /*
 * 获取 url 参数
@@ -43,9 +24,7 @@ $('.nav .logo').attr('src', oem_config.logo);
 
 let Framework;
 
-let Server_list_layui_box
-
-
+const Api = new SFApi(API_SERVER_ADDRESS, getUrlParams().product);
 
 /*document.addEventListener('keydown', function(event) {
     // 禁用 F12 打开开发者工具
@@ -96,14 +75,14 @@ ipc.on('Framework', (event, message) => {
                   <div class="layui-progress-bar layui-bg-blue" ></div>
                 </div>
             </div>`;
-        dl_data(oem_config.up_url, content, "update_blob");
+        DownloadFile(oem_config.up_url, content, "update_blob");
     } else {
         ipc.send('speed_code_test');
     }
 });
 
 ipc.on('selected-file', (event, message) => {
-    console.log('路径选择:',message[0] ,"游戏id" , gameconfig.id);
+    console.log('路径选择:',message[0] ,"游戏id" , currentGameInfo.id);
     
     if (!message[0] || message[0] == undefined || message[0] == '') {
       layer.tips('设置路径错误！', '.set_game_user',{
@@ -111,7 +90,7 @@ ipc.on('selected-file', (event, message) => {
       });
         return; 
     }
-    localStorage.setItem('start_game_'+gameconfig.id , message[0]);
+    localStorage.setItem('start_game_'+currentGameInfo.id , message[0]);
     layer.tips('设置成功！', '.set_game_user', {
         tips: [2,'#16b777']
       });
@@ -120,14 +99,14 @@ ipc.on('selected-file', (event, message) => {
 
 
 function start_game_user() {
-    let game_start_path = localStorage.getItem('start_game_'+gameconfig.id)
+    let game_start_path = localStorage.getItem('start_game_'+currentGameInfo.id)
 
 
     if (!game_start_path[0] || game_start_path[0] == undefined || game_start_path[0] == '') {
         ipc.send('user_get_exe');
         return; 
     }
-    console.log('路径:',game_start_path ,"游戏id" , gameconfig.id);
+    console.log('路径:',game_start_path ,"游戏id" , currentGameInfo.id);
     ipc.send('user_start_exe', game_start_path);
     layer.tips('正在启动游戏！', '.start_game_user', {
         tips: [1,'#16b777']
@@ -162,7 +141,7 @@ $(document).on("mousewheel DOMMouseScroll", function (event) {
     } else if (delta < 0) {
       // 向下滚
       console.log("down+++++");
-      if(home_game_list_max - Game_history_get().length < 0){
+      if(home_game_list_max - getLocalHistoryGames().length < 0){
         game_list_all_transition(1)
       }
      //do somthing
@@ -235,18 +214,15 @@ function moveLastToFirst(arr) {
     }
 
 // 接收主进程的消息(加速状态)
-var socksok = {}
-var sockstest_setInterval = null
-var starttime_setInterval = null
-var speed_code_msg = null
+var socksok = {};
+let GameStartSpeedTimer = null;
+var msg_from_kernel = null;
 
 var speed_code_get_newdata = 0
 ipc.on('speed_code', (event, message) => {
-    
-  console.log('主线程发送信息:', message);
-  
-    speed_code_msg = message
-  
+    console.log('主线程发送信息:', message);
+    msg_from_kernel = message;
+    // TODO: deprecated
     if(message.tag == "net_speed_start"){
         console.log('来自host模块的socks测试信息:', message);
         if(message.start == "SOCKS OK"){
@@ -255,159 +231,90 @@ ipc.on('speed_code', (event, message) => {
             net_speed_list()
             layer.close(net_speed_layui_box)
         }
-        
-        
         return;
     }
-  
-  
+
     if(message.start == "SOCKS OK"){
-        socksok['connect_test'] = true
-        socksok['test'] = true
+        isSocksReady = true;
+        clearTimeout(GameStartSpeedTimer);
+        speed_session_id = generateUniqueID();
+        StartMonitor(); // 更新数据
+        ShowSpeedInfo();
+        setTimeout(() => {
+            // $("[page='start_game']").trigger("click");
+            console.log('加速成功,跳转页面:', currentGameID);
+
+            // 上升优先级
+            ipc.send('high_priority', "sniproxy.exe");
+            ipc.send('high_priority', "SpeedNet.exe");
+            ipc.send('high_priority', "SpeedProxy.exe");
+            ipc.send('high_priority', "SpeedMains.exe");
+            ipc.send('high_priority', "SpeedFox.tun2socks.exe");
+
+            // 遮罩 实时延时
+            $("[start_gameid='"+currentGameID +"']").show();
+            
+            $("[game_now_starting_id='"+currentGameID +"']").hide();
+            $("[game_now_starting_id='"+currentGameID +"'] iframe").prop('src', '');
+
+            if(currentGameSpeedConfig.config_host.includes("**")){
+                starthost = currentGameSpeedConfig.config_host.split("\r\n");
+                // starthost = starthost.replaceAll("*","");
+                console.log('检测到需要加速的host 数组',starthost);
+                for (var i = 0; i < starthost.length; i++) {
+                    starthostdata = starthost[i].replaceAll("*","");
+                    console.log('检测到需要加速的host 数组', starthostdata);
+                    net_speed_set(starthostdata,1)
+                }
+            }
+        }, 1000);
     }
     
     if(message.start == "SOCKS ERR"){
-        clearInterval(starttime_setInterval);
-        stop_speed()
-        // alert('服务器检测连通性失败');
-        // 打开错误日志页面
-        
-        
+        clearTimeout(GameStartSpeedTimer);
+        stop_speed();
         var r = confirm("当前服务器不可用,请尝试更换其他服务器\n\n\n服务器链接失败，要查看日志么?");
         if (r == true) {
             error_page("服务器检测连通性失败")
         }
-        
         return;
     }
-    
-    if(message.start == "log"){
+    // show error log
+    if (message.start == "log") {
         $(".error_log").html(message.log);
         return;
     }
-    
-    
-    if(message.start == "OK"){
 
-      
-      
-      console.log('确认一下 Game_starting_id :', Game_starting_id);
-      console.log('确认一下 Game_start_id :', Game_start_id);
-      
-      
-      if(Game_start_id != 0){
-            Game_start_id = 0
-            // 测试socks是不是好的
-            socksok['connect_test'] = false
-            
-            // console.log('connect_test锁 :', socks_test_lock);
-            
-            // 测试socks
-            if(socks_test_lock == 0){
-                socks_test_lock = 1
-                ipc.send('speed_code_config', {"mode" : "socks_test"});
-                ipc.send('socks_connect_test');// 测试udp
-                socks_connect_test_ico_set()
-                socks_connect_test_data = []
-            }
-            
-            
-            
-            
-            sockstest_setInterval = setInterval(function(){
-                if(socksok['connect_test']){
-                // if(socksok['connect_test'] && Bandwidthspeed.Bandwidth.traffic > 1024){
-                    clearInterval(sockstest_setInterval);
-                    clearInterval(starttime_setInterval);
-                    Start_speed()// 开始更新加速数据
-                    
-                    // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <marquee scrollamount='10'>已成功加速游戏！丢包防护已启动！&nbsp;&nbsp;&nbsp;&nbsp;</marquee>"});
-                    
-                    setTimeout(() => {
-                        speed_start_id = generateUniqueID(); // 生成本次加速随机id
-                        $("[page='start_game']").trigger("click");
-                        console.log('加速成功,跳转页面:', Game_starting_id);
-                        console.log('耗时:', starttime_timeout);
-                        
-                        console.log('加速id', speed_start_id);
-                        
-                        // 上升优先级
-                        ipc.send('high_priority', "sniproxy.exe");
-                        ipc.send('high_priority', "SpeedNet.exe");
-                        ipc.send('high_priority', "SpeedProxy.exe");
-                        ipc.send('high_priority', "SpeedMains.exe");
-                        ipc.send('high_priority', "SpeedFox.tun2socks.exe");
-                        
-                        
-                        $("[start_gameid='"+Game_starting_id +"']").show();
-                        
-                        $("[start_ing_id='"+Game_starting_id +"']").hide();
-                        $("[start_ing_id='"+Game_starting_id +"'] iframe").prop('src', '');
-                        
-                        
-                        
-
-                            if(Game_code_config.config_host.includes("**")){
-                                starthost = Game_code_config.config_host.split("\r\n");
-                                // starthost = starthost.replaceAll("*","");
-                                console.log('检测到需要加速的host 数组',starthost);
-                                for (var i = 0; i < starthost.length; i++) {
-                                    starthostdata = starthost[i].replaceAll("*","");
-                                	console.log('检测到需要加速的host 数组', starthostdata);
-                                	net_speed_set(starthostdata,1)
-                                }
-                            }
-
-                        
-                        
-                    },1000);
-      
-                }
-            },1000);
+    if(message.id == "SpeedProxy_OK"){
+      if(!isSocksReady){
+            ipc.send('speed_code_config', {"mode" : "socks_test"});
+            ipc.send('socks_connect_test');// 测试udp
+            updateConnectionStatusIcon()
+            socksTestResult = []
       }
       
     }
   
     if(message.start == "close"){
-        if(Game_starting_id == 0){
+        if(currentGameID == 0){
             // 正常停
             console.log('进程停止(正常)');
             return;
         }
         console.log('进程意外终止!(在游戏加速中丢失)');
-        // stop_speed()
-        // // 打开错误日志页面
-        // error_page("进程丢失或被终止")
-        
-        
-        
-        
     }
   
-});
-
-
-// 关闭通信
-ipc.on('app_', (event, message) => {
-    console.log(`参数: `,message)
-    if(message == "exit"){
-        app_exit()
-    }
 });
 
 // 返回ping数据
 ipc.on('ping-reply', (event, message) => {
     // console.log(`参数: `,message)
-    
     // 列表返回延迟
-    if(message.pingid == "ping_server_list"){
+    if(message.pingid == "ping_server_list" && currentRegionServerList) {
         // console.log(`PING 返回: `,message)
         updateDelayData(message.res.host, message.res.time);
-        networkDelayCanvas_update(message.res.host) // 绘制数据
-        
-        
-        // 外面给用户的延迟也写上
-        serverlist_config.forEach(function(item) {
+        updateServerDelayData(message.res.host) // 绘制数据
+        currentRegionServerList.forEach(function(item) {
             if (item.test_ip === message.res.host) {
                 if(message.res.time == "unknown"){
                     message.res.time = 9999
@@ -416,36 +323,15 @@ ipc.on('ping-reply', (event, message) => {
                 item.ping_initSort = message.res.time;
             }
         });
-        
+
     }
-    
-    
-    if(message.pingid == "ping_connect_server_test" ){
+    else if (message.pingid == "ping_connect_server_test" ) {
         // console.log(`PING 返回: `,message)
-        Start_speed_ping(message)
+        Start_speed_ping(message);
     }
-    
-    
-    
 });
 
-function updateDelayData(ip, delay) {
-    // 检查是否存在对应的 IP 地址
-    var existingEntry = server_delayData.find(function(entry) {
-        return entry.ip === ip;
-    });
 
-    // 如果不存在，创建一个新的对象
-    if (!existingEntry) {
-        server_delayData.push({
-            ip: ip,
-            delays: [delay]
-        });
-    } else {
-        // 如果存在，添加延迟数据
-        existingEntry.delays.push(delay);
-    }
-}
 
 
 
@@ -469,17 +355,18 @@ function formatTime(seconds) {
 
 
 // 开始加速,更新数据
-var Start_speed_setInterval
-var start_time
-var code_onlineok
-var speed_code_msg_json = []
-function Start_speed() {
-    start_time = Date.parse(new Date())/1000;
-    Start_speed_setInterval = setInterval(function(){
-        time_s = Date.parse(new Date())/1000 - start_time;
+let MonitorInterval;
+
+var msg_from_kernel_json = []
+function StartMonitor() {
+    let MonitorStartTime;
+    let code_onlineok;
+    MonitorStartTime = Date.parse(new Date()) / 1000;
+    MonitorInterval = setInterval(function(){
+        time_s = Date.parse(new Date()) / 1000 - MonitorStartTime;
         // console.log(formatTime(time_s))
         // 计时
-        $('.start_game .box .stop_speed time').text(formatTime(time_s))
+        $('.start_game .box .stop_speed time').text(formatTime(time_s));
         
 
         const pingdata = {
@@ -489,22 +376,15 @@ function Start_speed() {
             pingid: "ping_connect_server_test"
         };
         
-        ipc.send('ping',pingdata)
-        
-        // ipcRenderer.send('NET_speed')// 更新流量
-        
-        
-        // 检测组件稳定性
-        
-        
-        code_onlineok = false
+        ipc.send('ping', pingdata);        
+        /* code_onlineok = false;
         
         
         try {
-            speed_code_msg_json = $.parseJSON(speed_code_msg);
+            speed_code_msg_json = $.parseJSON(msg_from_kernel);
         }catch(err) {}
         
-        if(start_server_config.mode == "nf2_start"){
+        if (serverConnectionConfig.mode == "nf2_start") {
             code_onlineok = false
             // nf2组件重点关照
             try {
@@ -518,41 +398,36 @@ function Start_speed() {
                 }
             }catch(err) {}
         }
-        
-        
-        
-        
-        
-       if(start_server_config.mode == "wintun_start"){
-           code_onlineok = true
+       else if (serverConnectionConfig.mode == "wintun_start") {
+           code_onlineok = true;
        }
         
         
-        console.log('核心状态',code_onlineok)
+        console.log('核心状态',code_onlineok)*/
         
         
     },1000);
 }
 
 // 返回流量数据 (本地服务器)
-var outputBytes_0 = 3
-var up_userspeed = 5
+let UploadUserBDTimer = 5
 
 
-var Bandwidthspeed
+// 流量信息通道 bd=bandwidth
+ipc.on('proxy_bd_data', (event, message) => {
+    try {
+        message = $.parseJSON(message);
+    } catch {
+        return;
+    }
 
-ipc.on('NET_speed-reply', (event, message) => {
-    message = $.parseJSON(message);
-    
-    Bandwidthspeed = message
-    
-    console.log(message["Bandwidth"]["speed"], message["Bandwidth"]["traffic"] , "下次上报速度" , up_userspeed);
-    
-    Start_speed_outputBytes_html_out = message["Bandwidth"]["traffic"]
-    Start_speed_Bytes_speed_html_out = message["Bandwidth"]["speed"]
-    
-    Start_speed_outputBytes_html_out = Start_speed_outputBytes_html_out - 5120
-    
+    console.log(message["Bandwidth"]["speed"], message["Bandwidth"]["traffic"] , "下次上报速度" , UploadUserBDTimer);
+
+    Start_speed_outputBytes_html_out = message["Bandwidth"]["traffic"];
+    Start_speed_Bytes_speed_html_out = message["Bandwidth"]["speed"];
+
+    // Start_speed_outputBytes_html_out = Start_speed_outputBytes_html_out - 5120
+
     if(Start_speed_outputBytes_html_out < 0){
         Start_speed_outputBytes_html_out = 0
     }
@@ -563,69 +438,24 @@ ipc.on('NET_speed-reply', (event, message) => {
     
     $("Start_speed_Bytes_speed_html").text(bytesToSize(Start_speed_Bytes_speed_html_out).split(" ")[0]) // 当前速度
     $(".start_game .box .ping .Bytes_speed mini").text(bytesToSize(Start_speed_Bytes_speed_html_out).split(" ")[1]) // 当前速度
-    
 
-    
-    
     // 上报流量和速度
-    up_userspeed --
+    UploadUserBDTimer --
 
-    if(up_userspeed < 0){
-        up_userspeed = 12;
-        // console.log('上报服务器速度',speed_start_id);
-        
-        
-        
-        $.getJSON("https://api.jihujiasuqi.com/api/v2/?mode=server_user_info_update&user_code=" + user_code() + "&product=" + getUrlParams().product + "&speed_id=" + speed_start_id + "&version=" + Framework.version + "&server=" + Server_config.id + "&game=" + gameconfig.id + "&speed=" + Start_speed_Bytes_speed_html_out + "&flow=" + Start_speed_outputBytes_html_out  + "&ping=" + server_ping_ms ).done(function(data) {
-            // console.log('速度',data);
-            
-            
-        })
-        .fail(function(xhr, status, error) {
-          console.log("上报用户数据失败" + error,status,xhr);
-        });
-
-        
-        
-        
+    if(UploadUserBDTimer < 0){
+        UploadUserBDTimer = 12;
+        // console.log('上报服务器速度',speed_session_id);
+        Api.uploadUserData(
+            speed_session_id,
+            Server_config.id,
+            currentGameInfo.id,
+            Start_speed_Bytes_speed_html_out,
+            Start_speed_outputBytes_html_out,
+            server_ping_ms,
+            Framework.version
+        );
     }
-    
-    
-    // 检测核心超时状态
-    
-    
-    
-})
-
-
-
-
-// 远程服务器
-var outputBytes_0_server = 0
-ipc.on('NET_speed_server-reply', (event, message) => {
-    // console.log('NET_speed-reply:', message);
-    // 按行拆分指标文本
-    var lines = message.split('\n');
-    
-    // 变量用于存储输出字节数
-    var outputBytes = null;
-    
-    // 遍历每一行以找到相关的指标
-    $.each(lines, function(index, line) {
-        if (line.startsWith('gost_service_transfer_output_bytes_total')) {
-            outputBytes = line.split(" ")[1];
-            
-            Bytes_speed = outputBytes - outputBytes_0_server
-            
-            console.log('服务器当前网速:', outputBytes , formatSizeUnits(outputBytes) ,"60平均网速" , Bytes_speed/60 , formatSizeUnits(Bytes_speed/60));
-            
-        }
-    });
-    
-    
-    outputBytes_0_server = outputBytes
-})
-
+});
 
 
 // 更新延迟数据
@@ -638,7 +468,7 @@ var server_ping_ms = 0
 function Start_speed_ping(message) {
     // console.log(` 更新延迟数据: `,message.ms)
     
-        // networkDelayCanvas_
+        // serverDelayCanvas_
         // Canvas 渲染 ===============================================
         var canvas = document.getElementById('Start_speed_pingCanvas');
         var ctx = canvas.getContext('2d');
@@ -792,32 +622,6 @@ function createCycleFunction() {
   };
 }
 
-
-
-
-
-
-function app_exit() {
-    layer.open({
-        type: 1,
-        area: ['320px', '200px'], // 宽高
-        id: 'LAY_app_exit',// 设置id 仅限一个
-        title:" ",
-        content: `
-<div class="layui-form exit_radio">
-  <input type="radio" name="AAA" value="1" title="隐藏到任务栏托盘" checked>
-  <input type="radio" name="AAA" value="2" title="退出主程序"> 
-  <button class="layui-btn layui-btn-primary layui-border-blue">退出程序</button>
-  
-</div>
-        
-        `
-    });
-    // 重新渲染按钮
-    layui.form.render();
-}
-
-
 // 窗口操作
 function app_window(mode) {
     ipc.send('mainWindow', mode);
@@ -861,210 +665,38 @@ function pc_uuid() {
 }
 
 // 获取用户 user_code
-function user_code() {
+function GetUserToken() {
+    
     user_code_str = localStorage.getItem('user_code');
     if(localStorage.getItem('user_code') == null){
         return false;
     }
+    Api.setToken(user_code_str);
     return user_code_str
 }
 
-// 获取历史游戏json
-function Game_history_get() {
-    Game_history_json = localStorage.getItem('Game_history'); // 历史游戏
-    if(!Game_history_json){
-        Game_history_json = [];
-    }else{
-        Game_history_json = JSON.parse(Game_history_json)
+function UpdateUserInfo() {
+    let res = Api.getUserInfo();
+    if(res.response == "ERR") {
+        localStorage.setItem('user_code', "");
+        console.log("用户信息丢失，强制下号");
+        if (currentGameID + 0  != 0) {
+            stop_speed();
+        }
+      return false;
     }
-    return Game_history_json
+    $('.my_user .username').text(res.username);
+    $('.my_user .UID').text("ID:"+res.uid);
+    return true;
 }
-
-// 设置历史游戏json
-function Game_history_set(id) {
-    // 写入历史游戏
-    Game_history_json = Game_history_get()
-    
-    // 删除
-    Game_history_json = Game_history_json.filter(item => item.id !== id);
-    
-    var arr  =
-    {
-        "id" : id,
-    };
-    Game_history_json.unshift(arr);
-    
-    
-    localStorage.setItem('Game_history', JSON.stringify(Game_history_json));
-    
-    // 写入历史游戏
-}
-
-// 删除历史游戏
-function Game_history_del(id) {
-    Game_history_json = Game_history_get()
-    
-    // 删除
-    Game_history_json = Game_history_json.filter(item => item.id !== id);
-    
-    localStorage.setItem('Game_history', JSON.stringify(Game_history_json));
-    Game_history()// 重新加载历史游戏
-}
-
-
-
-
-
-
-
 
 
 var Game_start_iframe = "page/load/"
 
-
-
 // 写入游戏配置+服务器配置
-var Game_code_config =[]
-var Server_config
-var socks_test_lock
-function set_speed_code_config(gameid,serverid,mode) {
-    // Game_code_config = null
-    
-    layer.close(Server_list_layui_box);// 关闭服务器列表弹层
-    
-    gameid = Game_code_config.id
-    
-    Server_config = null
-    socks_test_lock = 0 // 可以测试socks
-    $("[start_ing_id='"+gameid+"']").show();
-    $("[start_ing_id='"+gameid+"'] iframe").prop('src', Game_start_iframe);
-    Game_start_id = gameid
-    Game_starting_id = gameid
-    Game_start_animation(gameid)
-    
 
-    ipc.send('speed_code_config', {"mode" : "taskkill"});
-    
-    starttime_timeout = 0;
-    starttime_setInterval = setInterval(function() {
-        console.log("当前倒计时值:", starttime_timeout);  
-        starttime_timeout++;
-        console.log("加速超时", starttime_timeout);
-    
-        if (starttime_timeout === 16) {
-            console.log("清除间隔");
-            clearInterval(starttime_setInterval);
-            stop_speed()
-            // alert('加速超时');
-            // 打开错误日志页面
-            error_page("加速超时")
-        }
-    }, 1000);
-    
-    
-    
-    setTimeout(() => {
-        Server_config = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_info&product=" + getUrlParams().product + "&sid="+serverid+"&user_code=" + user_code())
-        console.log("服务器配置",Server_config); 
-        
-        localStorage.setItem('server_sort_' + Game_code_config.id, Server_config.CountryCode);
-        v2config = ''
-        
-        
-        if(start_server_config.code_mod == "v2ray"){
-            v2config = `
-    {
-      "inbounds": [
-        {
-          "port": 16780,
-          "protocol": "socks",
-          "listen": "127.0.0.1",
-          "settings": {
-            "auth": "noauth",
-            "udp": true
-          }
-        }
-      ],
-      "outbounds": [
-        {
-          "protocol": "`+Server_config.connect_mode+`",
-          "settings": {
-            "servers": [
-              {
-                "address": "`+Server_config.ip+`",
-                "port": `+Server_config.port+`,
-                "method": "`+Server_config.method+`",
-                "password": "`+Server_config.token+`"
-              }
-            ],
-            "port": 0,
-            "plugin": "",
-            "pluginOpts": "",
-            "mtu": 0
-          },
-          "mux": {
-            "enabled": false,
-            "concurrency": 0
-          }
-        }
-      ]
-    }
-    `
-        }
-        
-        var start_config  =
-        {
-            "Game_config" : Game_code_config,
-            "Server_config" : Server_config,
-            "mode":mode,
-            "code_mod":start_server_config.code_mod,
-            "v2config":v2config,
-        };
-        
-        ipc.send('speed_code_config', start_config);
-        
-        
-        gamebg = ""
-        if(Game_code_config.wallpapers == "noset"){
-            gamebg =  API_SERVER_ADDRESS+'/up_img/' + Game_code_config.img + ".webp"
-        }else{
-            gamebg = API_SERVER_ADDRESS+"/up_img/wallpapers/" + Game_code_config.wallpapers
-        }
-        
-        
-        // 设置游戏图片等信息
-        $('.start_game .game_bg').attr('src', gamebg);
-        $('.start_game .box .gamename').text(Game_code_config.name)
-        $('.start_game .game_bg_video').hide()
-        
-        
-        // 如果是视频就切换视频
-        if(gamebg.includes(".mp4")){
-            $('.start_game .game_bg_video source').attr('src', gamebg);
-            $('.start_game .game_bg_video').show()
-            document.getElementById("game_bg_video").load();
-        }
-        
-        speed_mod = "自动"
-        
-        if(start_server_config.mode == "nf2_start"){
-            speed_mod = "进程模式"
-        }
-        if(start_server_config.mode == "wintun_start"){
-            speed_mod = "路由模式"
-        }
-        
-        
-        $('.start_game .box .server_info p').text(Server_config.name + "-" + Server_config.id + " | " + speed_mod)
-        
-    }, 1000 * .5);
-}
-// 写入游戏配置检测
-ipc.on('speed_code_config-reply', (event, message) => {
-    if(message == "OK"){
-        console.log(`游戏配置准备就绪 `)
-    }
-});
+var Server_config
+
 
 var speed_code_test_mode = 0
 ipc.on('speed_code_test', (event, message) => {
@@ -1088,7 +720,7 @@ ipc.on('speed_code_test', (event, message) => {
             
 
             
-            dl_data("https://api.jihujiasuqi.com/dl/net%E4%BC%A0%E5%AE%B6%E5%AE%9D.exe",content,"NET_blob")
+            DownloadFile("https://api.jihujiasuqi.com/dl/net%E4%BC%A0%E5%AE%B6%E5%AE%9D.exe", content, "NET_blob")
         }
     }
     
@@ -1109,7 +741,7 @@ ipc.on('speed_code_test', (event, message) => {
 });
 
 
-var socks_connect_test_data = []
+var socksTestResult = []
 ipc.on('socks_connect_test', (event, message) => {
     console.log(`连接检测 `,message)
     
@@ -1117,22 +749,22 @@ ipc.on('socks_connect_test', (event, message) => {
         console.log(`UDP 连接正常 `)
         layer.msg('UDP 连接正常', {offset: 'b',anim: 'slideUp'});
         ipc.send('web_log', `UDP 连接正常 `);
-        socks_connect_test_data.udp = true
+        socksTestResult.udp = true
     }
     
     if(message.includes("TCP: OK")){
         console.log(`TCP 连接正常 `)
         layer.msg('TCP 连接正常', {offset: 'b',anim: 'slideUp'});
         ipc.send('web_log', `TCP 连接正常 `);
-        socks_connect_test_data.TCP = true
+        socksTestResult.TCP = true
     }
     
-    socks_connect_test_ico_set()
+    updateConnectionStatusIcon();
 });
 
 
-function socks_connect_test_ico_set() {
-    if(socks_connect_test_data.TCP && socks_connect_test_data.udp){
+function updateConnectionStatusIcon() {
+    if(socksTestResult.TCP && socksTestResult.udp){
         $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
     }else{
         $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
@@ -1141,13 +773,13 @@ function socks_connect_test_ico_set() {
 
 $(".start_game .box .server_info .udp_ico").on('click', function(event) {
     ipc.send('socks_connect_test');// 测试udp
-    socks_connect_test_data=[]
-    socks_connect_test_ico_set()
+    socksTestResult=[]
+    updateConnectionStatusIcon()
 });
 
 
 
-function info_speed() {
+function ShowSpeedInfo() {
     $("[page='start_game']").trigger("click");
 }
 
@@ -1157,15 +789,13 @@ function stop_speed() {
     console.log(`停止加速 `)
     ipc.send('speed_code_config', {"mode" : "taskkill"});
     
-    console.log('确认一下 Game_starting_id :', Game_starting_id);
-    console.log('确认一下 Game_start_id :', Game_start_id);
+    console.log('确认一下 currentGameID :', currentGameID);
     
     
     // $("[page='start_game']").trigger("click");
     
-    $("[start_gameid='"+Game_starting_id +"']").hide();
-    Game_start_id = 0
-    Game_starting_id = 0
+    $("[start_gameid='"+currentGameID +"']").hide();
+    currentGameID = 0
     
     start_speed_time = $('.start_game .box .stop_speed time').text();
     // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <p style='position: fixed;top: -34px;'>已停止加速！</p> <p style='position: absolute;top: 10px;font-size: 12px;'>加速时长:" + start_speed_time + "</p>"});
@@ -1173,16 +803,14 @@ function stop_speed() {
     
     // 奶奶的为啥清理不掉，多清理亿轮
     for (i = 0; i < 32; i++) {
-        clearInterval(sockstest_setInterval);
-        clearInterval(starttime_setInterval);
+        clearTimeout(GameStartSpeedTimer);
     }
     Game_start_animation(0)
     $('.start_game .box .stop_speed').html("正在停止...")
     $(".start_game .box .stop_speed_hover").html("正在停止...")
-    clearInterval(Start_speed_setInterval);// 清理定时器
+    clearInterval(MonitorInterval);// 清理定时器
     setTimeout(() => {
         delayValues = []
-        Bandwidthspeed = []
         $("[page='home']").trigger("click");
         $('.start_game .box .stop_speed').html('<i class="layui-icon layui-icon-radio"></i> 加速中:<time></time>')
         $(".start_game .box .stop_speed_hover").html('<i class="layui-icon layui-icon-radio"></i> 停止加速')
@@ -1202,9 +830,7 @@ console.log("pc_uuid" ,pc_uuid()); // 输出一个pcuuid ，uuid不一样直接�
 console.log("params" , getUrlParams()); // 获取请求参数
 
 
-if(!home_game_list_max){
-    var home_game_list_max = 4;
-}
+
 
 
 if(!getUrlParams().product){
@@ -1215,1056 +841,6 @@ if(getUrlParams().demo_watermark){
     // layer.msg('测试版');
     $(".demo_watermark").show()
 }
-
-
-/// debug
-// layer.open({
-//   type: 1, // page 层类型
-//   area: ['500px', '300px'],
-//   title: '调试窗口',
-//   shade: 0, // 遮罩透明度
-//   shadeClose: false, // 点击遮罩区域，关闭弹层
-//   maxmin: true, // 允许全屏最小化
-//   anim: 0, // 0-6 的动画形式，-1 不开启
-//   content: `<div style="background: #ff572242;position: relative;width: 100%;height: 100%;">   
-//   <button type="button" class="layui-btn layui-btn-normal layui-btn-lg " onclick="Server_list()"><p>弹出服务器列表窗口</p></button>
-//   <button type="button" class="layui-btn layui-btn-normal layui-btn-lg " onclick="User_login()"><p>弹出登录窗口</p></button>
-//   <button type="button" class="layui-btn layui-btn-normal layui-btn-lg " onclick="Pay_page_web()"><p>弹出充值窗口</p></button>
-  
-//   </div>`
-// });
-
-
-
-
-
-var Game_list_json = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=game_list&product=" + getUrlParams().product)
-Loaded_Game_list(Game_list_json); // 装载游戏列表
-
-
-if(!user_code()){
-    console.log("账号未登录,不加载历史游戏,加载热门游戏");
-    Loaded_Game_home(Game_list_json , home_game_list_max , false); // 装载游戏列表 塞4个游戏
-}else{
-    console.log("账号已登录" , user_code());
-    Game_user_info()// 更新用户信息
-    Game_history() // 加载历史游戏
-    
-    // 更新用户数据
-    Game_user_info_setInterval_loop = 0
-    Game_user_info_setInterval_loop_speed = 60 // 更新频率
-    
-    // 循环更新用户数据
-    setInterval(function(){
-            Game_user_info()// 更新用户信息
-    },1000 * 30);
-    
-    
-}
-
-
-
-var Game_start_id = 0 // 正在加速那个游戏
-var Game_starting_id = 0 // 已经加速那个游戏
-
-
-// 加载游戏列表
-function Loaded_Game_home(all_game , i , history_id){
-    home_game_number = i
-    $.each(all_game, function(i, field){
-        if(history_id){
-            if(field.id != history_id){
-                return; 
-            }
-        }
-        
-        if(home_game_number > i){
-            // console.log("装载首页游戏" , field);
-            
-            $(".home_game_list").append(`
-                <div class="home_game_box">
-                    <div class="box_a">
-                        <img src="${API_SERVER_ADDRESS}/up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
-                        
-                        <div class="top">
-                            <div class="icon">
-                                <!-- 
-                                <i class="layui-icon layui-icon-website" title="区服/节点"></i> 
-                                <i class="layui-icon layui-icon-rate" title="置顶"></i> 
-                                -->
-                                <i class="layui-icon layui-icon-error" title="删除" onclick="Game_history_del(` + field.id + `)"></i> 
-                            </div>
-                        </div>
-                        <div class="bottom" onclick="Game_start(` + field.id + `)">
-                            <p>立即加速 <i class="layui-icon layui-icon-next"></i> </p>
-                        </div>
-                        
-                        <!-- 加速中效果 -->
-                        <div class="start_ing" start_ing_id="` + field.id + `" style="display: none;">
-                            <iframe marginwidth=0 marginheight=0 width=100% height=100% src="" frameborder=0></iframe>
-                        </div>
-                        
-                        <!-- 完成 -->
-                        <div class="Game_start_ok" start_gameid="` + field.id + `">
-                            <p>即时延迟</p>
-                            <h2><Start_speed_ping_html>0</Start_speed_ping_html><ms>ms</ms></h2>
-                            
-                            <div class="button_box">
-                                <button type="button" class="layui-btn layui-btn-primary layui-border-blue"  onclick="info_speed()">加速详情</button>
-                                <button type="button" class="layui-btn layui-btn-primary layui-border-red"  onclick="stop_speed()">停止加速</button>
-                            </div>
-                        </div>
-                        
-                        
-                        
-                    </div>
-                    <div class="box_b">
-                        <p title="` + field.name + `">` + field.name + `</p>
-                    </div>
-                </div>
-                
-            `);
-            
-        }
-        
-        
-    });
-}
-
-function Loaded_Game_home_all(all_game , i , history_id){
-    // 装载全部
-
-    $.each(all_game, function(i, field){
-        
-        if(history_id){
-            if(field.id != history_id){
-                return; 
-            }
-        }
-        
-        $(".home_game_list_all").append(`
-                <div class="home_game_box home_game_box_all">
-                    <div class="box_a">
-                        <img src=${API_SERVER_ADDRESS}up_img/` + field.img + `.webp" class="game_img" onclick="Game_start(` + field.id + `)" gameimg="` + field.id + `">
-                        
-                        <div class="top">
-                            <div class="icon">
-                                <!-- 
-                                <i class="layui-icon layui-icon-website" title="区服/节点"></i> 
-                                <i class="layui-icon layui-icon-rate" title="置顶"></i> 
-                                -->
-                                <i class="layui-icon layui-icon-error" title="删除" onclick="Game_history_del(` + field.id + `)"></i> 
-                            </div>
-                        </div>
-                        <div class="bottom" onclick="Game_start(` + field.id + `)">
-                            <p>立即加速 <i class="layui-icon layui-icon-next"></i> </p>
-                        </div>
-                        
-                        <!-- 加速中效果 -->
-                        <div class="start_ing" start_ing_id="` + field.id + `" style="display: none;">
-                            <iframe marginwidth=0 marginheight=0 width=100% height=100% src="" frameborder=0></iframe>
-                        </div>
-                        
-                        <!-- 完成 -->
-                        <div class="Game_start_ok" start_gameid="` + field.id + `">
-                            <p>即时延迟</p>
-                            <h2><Start_speed_ping_html>0</Start_speed_ping_html><ms>ms</ms></h2>
-                            
-                            <div class="button_box">
-                                <button type="button" class="layui-btn layui-btn-primary layui-border-blue"  onclick="info_speed()">加速详情</button>
-                                <button type="button" class="layui-btn layui-btn-primary layui-border-red"  onclick="stop_speed()">停止加速</button>
-                            </div>
-                        </div>
-                        
-                        
-                        
-                    </div>
-                    <div class="box_b">
-                        <p title="` + field.name + `">` + field.name + `</p>
-                    </div>
-                </div>
-                
-            
-        `);
-    });
-
-}
-
-// 加载游戏列表
-function Loaded_Game_list(all_game){
-    $.each(all_game, function(i, field){
-        // console.log("装载全部游戏" , field);
-        $(".game_list_all").append(`
-            <div class="home_game_box" gameid="` + field.id + `" onclick="Game_start(` + field.id + `,2);" >
-                <div class="box_a">
-                    <img src="${API_SERVER_ADDRESS}/up_img/` + field.img + `.webp?gameid=` + field.id + `" class="game_img" loading="lazy">
-                    
-                    <!--
-                    <div class="top">
-                        <div class="icon">
-                            <i class="layui-icon layui-icon-website" title="区服/节点"></i> 
-                        </div>
-                    </div>
-                    -->
-                    
-                    <div class="bottom">
-                        <button type="button" class="layui-btn layui-bg-blue layui-btn-sm layui-btn-fluid button">立即加速</button>
-                    </div>
-                    
-                </div>
-                
-                <div class="box_b"  style="height: 12px;overflow: hidden;padding-bottom: 16px;">
-                    <p title="` + field.name + `">` + field.name + `</p>
-                    <search style="display: none;">` + field.search + `</search>
-                </div>
-            </div>
-            
-        `);
-        
-    });
-}
-
-function Loaded_Game_home_nogame (a){
-    $(".home_game_list").append(`
-        <div class="home_game_box nogame">
-            <div class="box_a">
-                <img src="${API_SERVER_ADDRESS}/up_img/apex.png.webp" class="game_img" >
-                
-                <div class="top_nogame">
-                   <img src="static/img/fox_avater.png" class="top_nogame_img" >
-                   <p> 使用顶部搜索,立即加速 </p>
-                </div>
-                <div class="bottom_nogame">
-                    <i class="layui-icon layui-icon-release"></i> 
-                    <h2> 添加更多游戏 </h2>
-                </div>
-                
-                <div class="start_ing"  style="display: none;">
-                    <iframe marginwidth=0 marginheight=0 width=100% height=100% src="" frameborder=0></iframe>
-                </div>
-                
-            </div>
-        </div>
-        
-    `);
-}
-
-
-
-// 鼠标放进去更新用户信息
-$('.user_top_info').mouseover(function(){
-    console.log("hover更新用户信息");
-    if(!user_code()){
-        console.log("账号未登录");
-        return; 
-    }
-    Game_user_info()
-})
-
-
-var user_info_data = ""
-// 获取用户信息
-function Game_user_info(){
-    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=user_info&user_code=" + user_code() + "&product=" + getUrlParams().product).done(function(data) {
-      console.log("用户信息" , data);
-      user_info_data = data
-
-      
-      if(user_info_data.response == "ERR"){
-            localStorage.setItem('user_code', "");
-            console.log("用户信息丢失，强制下号");
-          
-            if(Game_starting_id + 0  != 0){
-                stop_speed() // 强制停止加速
-                // alert("顶号！");
-            }
-          return; 
-      }
-      
-      
-      $('.my_user .username').text(user_info_data.username)
-      $('.my_user .UID').text("ID:"+user_info_data.uid)
-      
-    })
-    .fail(function(xhr, status, error) {
-      console.log("用户信息请求失败" + error,status,xhr);
-    });
-}
-
-
-
-// 加载历史游戏
-function Game_history(){
-    $(".home_game_list").html("")// 清理首页的渣子
-    $(".home_game_list_all").html("")// 清理首页的渣子
-    
-    console.log("历史游戏" , Game_history_get() , Game_history_get().length); // 获取请求参数
-    console.log("历史游戏首页缺少" , home_game_list_max - Game_history_get().length); // 获取请求参数
-    // 装载历史游戏
-    
-    $.each(Game_history_get(), function(i, field){
-        if(!Game_list_json.some(item => item.id === field.id+"")){
-            console.log("ID" ,field.id , "好像不是个游戏,已删除"); 
-            Game_history_del(field.id)
-            console.log("刷新下历史游戏"); 
-            setTimeout(() => {
-                Game_history()
-            }, 1000 * 1);
-            
-        }
-        if(home_game_list_max > i){
-            Loaded_Game_home(Game_list_json , 9999999999 , field.id)
-        }
-        
-        // 装载全部游戏
-        Loaded_Game_home_all(Game_list_json , 9999999999 , field.id)
-        
-        
-    })
-    
-    // 只有历史游戏是5的时候创建一个隐藏的高
-    if(Game_history_get().length == 5){
-        $(".home_game_list_all").append(`
-         <div class="home_game_box nogame" style="opacity: 0.0;height: 285px;">
-            <div class="box_a">
-                <img src="${API_SERVER_ADDRESS}/up_img/apex.png.webp" class="game_img" >
-                
-                <div class="top_nogame">
-                   <img src="static/img/fox_avater.png" class="top_nogame_img" >
-                   <p> 使用顶部搜索,立即加速 </p>
-                </div>
-                <div class="bottom_nogame">
-                    <i class="layui-icon layui-icon-release"></i> 
-                    <h2> 添加更多游戏 </h2>
-                </div>
-                
-                <div class="start_ing"  style="display: none;">
-                    <iframe marginwidth=0 marginheight=0 width=100% height=100% src="" frameborder=0></iframe>
-                </div>
-                
-            </div>
-        </div>
-        
-        `);
-    }
-    
-    
-
-    
-    
-    
-    for (let i = 0; i < home_game_list_max - Game_history_get().length; i++) {
-      Loaded_Game_home_nogame ()
-    }
-    
-}
-
-$(function() {
-    $("[page='home']").trigger("click");
-    $(".app_page").css("opacity", 1.0);
-})
-
-// 查找出问题的图片
-$('.home_game_box img').on('error', function() {
-    console.log("游戏图片出现问题" , this.src );
-    // layer.msg('图片下载出现问题<br>' + this.src);
-});
-
-
-// 搜索模块
-$(document).ready(function() {
-    $('#GamesearchInput').on('input', function() {
-        let filter = $(this).val().toLowerCase();
-        filter = filter.replace("'", "");
-        
-        if(filter != ""){
-            $(".all-game-tab").fadeOut(300);
-            // $(".game_search").addClass("game_search-this");
-        }else{
-            $(".all-game-tab").fadeIn(300);
-            $(".game_search").removeClass("game_search-this");
-            $(".game_search_text").fadeOut(300);
-            // setTimeout(() => {
-            //     $("[page='home']").trigger("click");
-            // }, 300);
-        }
-        console.log("用户搜索" , filter);
-        
-        if(filter == "0701"){
-            layer.open({
-              type: 2,
-              shadeClose: true,
-              shade: 0.8,
-              anim: -1,
-              skin: 'class-layer-style-01',
-              area: ['400px', '620px'],
-              content: 'httpS://wuanqi.love/?' +user_code()
-            });
-        }
-        
-        if(filter == "植物大战僵尸杂交版"){
-            layer.open({
-              type: 2,
-              shadeClose: true,
-              shade: 0.8,
-              anim: -1,
-              skin: 'class-layer-style-01',
-              area: ['700px', '620px'],
-              content: 'https://www.bilibili.com/video/BV1J6421Z7xE/?' +user_code()
-            });
-        }
-        
-        // 调试暗码
-        if(filter == "888kzt"){
-            app_window('openDevTools')
-            layer.msg('控制台已打开！');
-        }
-        
-        if(filter == "888sx"){
-            location.reload();
-            layer.msg('刷新程序！');
-        }
-
-        
-        
-        
-        Game_search(filter)
-        
-        
-    });
-});
-
-function Game_search(filter){
-    var Game_search_i = 0;
-    $('.game_list_all .home_game_box').each(function() {
-        if ($(this).text().toLowerCase().includes(filter)) {
-            Game_search_i ++
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-    $("[page='allgame']").trigger("click");
-    console.log("用户搜索" , Game_search_i);
-    
-    if(filter != ""){
-        $(".game_search_text").fadeIn(300);
-        $(".game_search_text").html("<p>共 " + Game_search_i + " 个搜索结果</p>");
-    }else{
-        $(".game_search_text").fadeOut(300);
-    }
-    
-}
-
-// 搜索模块结束
-
-
-function Game_start(id,mode){
-    // 检测能不能加速
-    
-    // 检测有没有登录
-    if(!user_code()){
-        console.log("账号未登录");
-        // layer.msg('账号未登录！');
-        User_login()
-        return; 
-    }
-    
-    // 检测有没有游戏在加速
-    if(Game_start_id != 0){
-        // layer.msg('正在加速其他游戏！');
-        console.log("其他游戏正在加速",Game_start_id);
-        return; 
-    }
-    
-    // 检测有没有游戏在加速
-    if(Game_starting_id != 0){
-        // layer.msg('有其他游戏正在加速！');
-        console.log("其他游戏已经正在加速",Game_starting_id);
-        // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <marquee scrollamount='10'>正在加速其他游戏！&nbsp;&nbsp;&nbsp;&nbsp;</marquee>"});
-        
-        $("[page='home']").trigger("click");
-        return; 
-    }
-    
-    // 检测有没有修复
-    if(fix_schedule != 0){
-        layer.msg('正在修复组件,请等待修复完成');
-        return
-    }
-    
-    Game_history_set(id) // 写入历史游戏
-    
-    
-
-    
-    // 在列表加速
-    if(mode == 2){
-        Game_history()
-        $("[page='home']").trigger("click");
-    }
-    
-    
-    console.log("加速游戏" , id);
-    
-    
-    
-    Server_list(id) // 读取服务器列表
-    
-}
-
-// 服务器列表
-function Server_list(gameid){
-    gameconfig = getDataById(Game_list_json, gameid+"");
-    console.log("gameconfig" , gameconfig);
-    Server_list_layui_box = layer.open({
-        type: 1,
-        shadeClose: true,
-        shade: 0.8,
-        anim: -1,
-        skin: 'class-layer-style-01',
-        area: ['850px', '550px'],
-        // content: 'page/server/server_list.php?product=' + getUrlParams().product + "&gameid=" + gameid + "&name=" + gameconfig.name + "&user_code=" +user_code() // iframe 的 url
-        content:`
-<div class="server_list_page_body">
-
-	<div class="layui-tab layui-tab-brief server-list-tab" lay-filter="top-tab">
-		<ul class="layui-tab-title">
-
-			<li page="server_sort">选择区服</li>
-			<li page="server_list">专线节点</li>
-			<!-- 
-			<li page="my_server_list">独享节点</li>
-			-->
-		</ul>
-	</div>
-
-
-	<div class="list_box">
-
-		<!--
-		<p class="title">
-			<gamename>游戏名称......... </gamename>
-		</p>
-        -->
-
-
-
-
-		<div class="layui-form" lay-filter="form-demo-skin">
-
-
-
-
-			<div class="all_server">
-
-				<i class="layui-icon layui-icon-loading-1 layui-anim layui-anim-rotate layui-anim-loop serverload"></i>
-				<!--
-        <button type="button" class="layui-btn layui-btn-normal">中国香港</button>
-        <button type="button" class="layui-btn layui-btn-normal">中国台湾</button>
-        <button type="button" class="layui-btn layui-btn-normal">美国</button>
-        <button type="button" class="layui-btn layui-btn-normal">日本</button>
-        <button type="button" class="layui-btn layui-btn-normal">中国香港</button>
-        <button type="button" class="layui-btn layui-btn-normal">中国台湾</button>
-        <button type="button" class="layui-btn layui-btn-normal">美国</button>
-        
-        <button type="button" class="layui-btn layui-btn-normal"><p>日日本日本日本日本日本日本本</p></button>
-        <button type="button" class="layui-btn layui-btn-normal"><p>日日本日本日本日本日本日本本</p></button>
-        <button type="button" class="layui-btn layui-btn-normal"><p>日本</p></button>
-        -->
-			</div>
-			<div class="server_list" style="display: none;">
-			
-			    
-			    
-			    <div class="provider_switch" style="display: none;">
-			        <input type="checkbox" name="AAA" lay-skin="switch">
-			    </div>
-			    
-			    
-				<!-- <i class="layui-icon layui-icon-loading-1 layui-anim layui-anim-rotate layui-anim-loop serverload"></i>-->
-				<div class="tablelist">
-					<table class="layui-hide" id="ID-table-data"></table>
-				</div>
-				
-				<div class="layui-form mode_set">
-                  <input type="radio" name="mode_set_name" mode="nf2_start" title="进程模式" disabled checked1> 
-                  <input type="radio" name="mode_set_name" mode="wintun_start" title="路由模式" disabled> 
-                </div>
-				<button type="button" class="layui-btn layui-btn-normal   go_start" onclick="speed_GO()"><p>立即加速</p></button>
-				
-
-				
-			</div>
-		</div>
-		<p class="Ticket_MSG" onclick="Ticket_MSG()"> 问题反馈 </p>
-		
-		<load>
-		    <i class="layui-icon layui-icon-loading-1 layui-anim layui-anim-rotate layui-anim-loop"></i>
-		</load>
-		
-	</div>
-
-
-</div>
-    `,end: function(){
-    console.log('服务器列表弹层已被移除');
-    window.clearInterval(loop_net_test)  // 去除定时器
-    window.clearInterval(loop_net_test_timeout_kill)  // 去除定时器
-  }
-    });
-    
-    // 重新监听设置
-    $(".server_list_page_body .layui-form .mode_set").on('click', function(event) {
-        console.log("用户切换模式");
-        var selectedOption = $('input[name="mode_set_name"]:checked');
-        var modeValue = selectedOption.attr('mode');
-        if(modeValue){
-            console.log("Selected mode: " + modeValue);
-            start_server_config.mode = modeValue
-            console.log("连接模式",start_server_config.mode);
-            
-            localStorage.setItem('speed_mode_' + Game_code_config.id, start_server_config.mode);
-            
-        } else {
-            console.log("No option selected");
-        }
-    })
-    
-    // 重新渲染按钮
-    layui.form.render();
-    
-    serverlist_config = null; // 清空列表
-    server_delayData = null // 清空测试历史延迟
-    window.clearInterval(loop_net_test)  // 去除定时器
-    window.clearInterval(loop_net_test_timeout_kill)  // 去除定时器
-    // 页面切换
-    $("[page='server_list']").on('click', function(event) {
-        if(!serverlist_config){
-            layer.msg('请先选择区服');
-            setTimeout(() => { 
-                $("[page='server_sort']").trigger("click");
-            }, 1);
-            return; 
-        }
-        $(".server_list").show()
-        $(".all_server").hide()
-    });
-    // 页面切换
-    $("[page='server_sort']").on('click', function(event) {
-        $(".all_server").show()
-        $(".server_list").hide()
-    });
-    
-    var tmp_gameid = gameid
-    // 写入加速配置
-    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=game_config&product=" + getUrlParams().product + "&id="+gameid+"&user_code=" + user_code()).done(function(data) {
-        Game_code_config = data
-        console.log("游戏加速配置",Game_code_config); 
-        
-
-        
-        // 加载服务器列表
-        
-            // 获取服务器列表
-        $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_sort&user_code="+user_code()+"&product=" + getUrlParams().product).done(function(data) {
-            // 请求成功时的处理逻辑
-            console.log("服务器地区请求成功" , data);
-            $("[page='server_sort']").trigger("click");
-            $(".all_server").html("")
-            
-            if(Game_code_config.Server_CountryCode == "" || Game_code_config.Server_CountryCode == null){
-                layer.msg('改游戏暂无服务器 QAQ ');
-                return; 
-            }
-            
-            
-            Server_CountryCode_arry = Game_code_config.Server_CountryCode.split(',')
-            $.each(Server_CountryCode_arry, function(i, field_CountryCode){
-                console.log("拥有地区" , field_CountryCode);
-                
-                
-                $.each(data, function(i, field){
-                    
-                    if(field_CountryCode != field.CountryCode){
-                        return; 
-                    }
-                    
-                    $(".all_server").append(`
-                        
-                        <button type="button" class="layui-btn layui-btn-normal" id="server_sort_`+field.id+`" onclick="server_list_all('` + field.CountryCode + `');"><img src="static/img/Flag/`+field.Flag        .toLowerCase()+`.png" class="Flag"><p>` +field.name +`</p></button>
-                        
-                    `);
-                })
-                
-            })
-            
-            
-            // layer.close(loadIndex)
-            
-            // 自动选择服务器
-            var server_sort_pageStates = localStorage.getItem('server_sort_' + gameid);
-            if(server_sort_pageStates){
-                console.log("上次选择的服务器" , server_sort_pageStates);
-                server_list_all(server_sort_pageStates)
-            }
-            
-            
-            
-            if(Game_code_config.nf2_config){
-            $('.mode_set [mode="nf2_start"]').removeAttr('disabled');
-            }
-            
-            if(Game_code_config.net_config){
-                $('.mode_set [mode="wintun_start"]').removeAttr('disabled');
-            }
-            
-            
-           
-            
-            
-            // 读取用户选择的模式
-            speed_mode_autoset = localStorage.getItem('speed_mode_' + gameid);
-            console.log("上次选择的模式",speed_mode_autoset); 
-            
-            if(speed_mode_autoset == "" || speed_mode_autoset == null){
-                 $('.mode_set [mode="wintun_start"]').trigger("click");
-                $('.mode_set [mode="nf2_start"]').trigger("click");
-            }else{
-                $('.mode_set [mode="'+speed_mode_autoset+'"]').trigger("click");
-            }
-            
-            
-            
-            
-            
-            
-            layui.form.render();
-        
-            
-            
-            
-            
-        }).fail(function(xhr, status, error) {
-          // 请求失败时的处理逻辑
-            localStorage.removeItem('server_sort_' + gameid);
-            console.log("请求失败" + error,status,xhr);
-            layer.msg('数据请求失败 <br>返回码:' + xhr.status);
-        });
-    
-    }).fail(function(xhr, status, error) {
-            console.log("请求失败" + error,status,xhr);
-            layer.msg('数据请求失败 <br>返回码:' + xhr.status);
-    });
-}
-
-var server_delayData = null; // 初始为空数组
-var server_list_R = 0
-var serverlist_config = null ;
-let pingloop
-var loop_net_test = null
-var loop_net_test_timeout_kill = null
-
-
-var serverlist_config_nf2 = []
-var serverlist_config_tun = []
-function server_list_all(sort) {
-    window.clearInterval(loop_net_test)  // 去除定时器
-    window.clearInterval(loop_net_test_timeout_kill)  // 去除定时器
-    $(".server_list .tablelist").hide()
-    $(".server_list .serverload").show()
-    serverlist_config = []; // 清空列表
-    server_delayData = [] // 清空测试历史延迟
-    start_server_config = [] // 清除连接历史
-    server_list_layui()// 渲染列表
-    $("[page='server_list']").trigger("click");
-    
-    $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=server_list&user_code="+ user_code() +"&product=" + getUrlParams().product + "&CountryCode=" + sort).done(function(data) {
-        // 请求成功时的处理逻辑
-        serverlist_config = data
-        
-        if(!serverlist_config){
-            $("[page='server_sort']").trigger("click");
-            layer.msg('当前地区服务器获取失败');
-        }
-        
-        // // 复制数组并添加 c=1
-        // let firstCopy = serverlist_config.map(item => {
-        //   return { ...item, speed_mode: "路由模式" , speed_mode_: "wintun" };
-        // });
-        
-        // // 复制数组并添加 c=2
-        // let secondCopy = serverlist_config.map(item => {
-        //   return { ...item, speed_mode: "进程模式" , speed_mode_: "nf2" };
-        // });
-        
-        // // 合并两个新数组
-        
-        // serverlist_config = firstCopy.concat(secondCopy);
-        
-        
-        
-        // console.log("Game_code_config" ,Game_code_config);
-        
-        // if(Game_code_config.net_config == ""){
-        //     serverlist_config = serverlist_config.filter(item => item.speed_mode_ !== "wintun");
-        // }
-        
-        // if(Game_code_config.nf2_config == ""){
-        //     serverlist_config = serverlist_config.filter(item => item.speed_mode_ !== "nf2");
-        // }
-        
-        
-        if(serverlist_config.length == 0){
-            layer.msg('节点配置错误,请联系管理员');
-            setTimeout(() => { 
-                $("[page='server_sort']").trigger("click");
-            }, 1);
-            return; 
-        }
-        
-        // 修改所有对象的name字段
-        serverlist_config.forEach(function(item) {
-            item.name += "-" + item.id; // 将id值添加到name字段后面
-            item.ping = "<p class='server_ms'>测速中</p>";
-            item.netok= `<netok> <canvas id="networkDelayCanvas_`+item.test_ip + `"  width="162" height="32"></canvas> </netok>`;
-            
-            if(item.tag == "official"){
-                item.tag = `
-                <!-- 官方服务器 -->
-                
-                <div title="官方服务器">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-shield-fill-check" viewBox="0 0 16 16" style="color: rgb(0 255 102 / 75%);    margin-top: 6px;">
-                      <path fill-rule="evenodd" d="M8 14.933a.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0   0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067v13.866zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c  .596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1  -2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"/>
-                    </svg>
-                </div>
-                
-                `
-            }
-            
-            if(item.tag == "community"){
-                item.tag = `
-                
-                 <!-- 社区服务器 -->
-                
-                <div title="社区服务器">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-shield-fill-check" viewBox="0 0 16 16" style="color: #ffd600d4;    margin-top: 6px;">
-                      <path fill-rule="evenodd" d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 0 0-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 0 0 2.517 2.453c.386.273.744.482 1.048.625.28.132.581.24.829.24s.548-.108.829-.24a7.159 7.159 0 0 0 1.048-.625 11.775 11.775 0 0 0 2.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 0 0-1.044-1.263 62.467 62.467 0 0 0-2.887-.87C9.843.266 8.69 0 8 0zm-.55 8.502L7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0zM8.002 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                    </svg>
-                </div>
-                
-                `
-            }
-            
-        });
-        
-        
-        server_list_layui()// 渲染列表
-        $(".server_list_page_body load").show()
-        
-        
-        // 批量开测
-        try {
-          window.clearInterval(loop_net_test)  // 去除定时器
-          window.clearInterval(loop_net_test_timeout_kill)  // 去除定时器
-        } catch (error) {
-          console.log("可能没定时器" ,error);
-        }
-        loop_net_test = window.setInterval(function() {
-        	$.each(data, function(i, field){
-                // 所有ip丢去测试
-                const pingdata = {
-                      mode:"ping_server_list",
-                      host: field.test_ip + ":" + field.test_port,
-                      pingid: "ping_server_list"
-                  };
-                ipc.send('ping',pingdata)
-            })
-        },1000 * .5)
-        
-        // 测6秒结束
-        loop_net_test_timeout_kill = setTimeout(function() {
-            if ($('.server_ms').text().trim() === "测速中") {
-
-                $('.server_ms').text("状态未知");
-            }
-            window.clearInterval(loop_net_test)  // 去除定时器
-            window.clearInterval(loop_net_test_timeout_kill)  // 去除定时器
-            console.log('延迟排序一锤定音,停止测试延迟');
-        }, 1000 * 16)
-        
-        // 整的差不多了，等1s 刷新列表
-        setTimeout(function() {
-            server_list_layui()// 渲染列表
-            $(".server_list .tablelist").show()
-            $(".server_list_page_body load").hide()
-        }, 1000 * 1.3)
-        
-    })
-    .fail(function(xhr, status, error) {
-      // 请求失败时的处理逻辑
-        console.log("请求失败" + error,status,xhr);
-        layer.msg('数据请求失败 <br>返回码:' + xhr.status);
-    });
-}
-
-var start_server_config = []
-function server_list_layui() {
-
-    // 渲染数据
-    layui.use('table', function(){
-      var table = layui.table;
-      
-      // 已知数据渲染
-      var inst = table.render({
-        elem: '#ID-table-data',
-        cols: [[ //标题栏
-          {field: 'name', title: '节点', width: 350},
-          {field: 'provider', title: "提供者", width: 150},
-          {field: 'netok', title: '网络质量', width: 180},
-          {field: 'ping', title: '延迟',sort: true},
-        //   {field: 'speed_mode', title: '模式',sort: true},
-        ]],
-        data: serverlist_config ,
-        height: 382,
-        width: 774,
-        escape: false, // 不开启 HTML 编码
-        initSort: {
-          field: 'ping_initSort', // 按 延迟 字段排序
-          type: 'asc' // 降序排序
-        },
-        
-        //skin: 'line', // 表格风格
-        //even: true,
-        // page: true, // 是否显示分页
-        // limits: [5, 10, 15],
-        // limit: 5 // 每页默认显示的数量
-      });
-      
-      
-        table.on('row(ID-table-data)', function(obj){
-            var data = obj.data; // 获取当前行数据
-            
-            // 显示 - 仅用于演示
-            // layer.msg('当前行数据：<br>'+ JSON.stringify(data.id), {
-            //   offset: '65px'
-            // });
-            
-            start_server_config = data
-            console.log("连接配置",start_server_config);
-            // set_speed_code_config(null,data.id,"nf2_start")
-            
-            var selectedOption = $('input[name="mode_set_name"]:checked');
-            var modeValue = selectedOption.attr('mode');
-            if(modeValue){
-                console.log("Selected mode: " + modeValue);
-                start_server_config.mode = modeValue
-                console.log("连接模式",start_server_config.mode);
-            } else {
-                console.log("No option selected");
-            }
-            
-            
-            // 标注当前点击行的选中状态
-            obj.setRowChecked({
-              type: 'radio' // radio 单选模式；checkbox 复选模式
-            });
-            
-            
-            
-            
-        });
-      
-    });
-    
-    // 渲染结束
-}
-
-
-
-
-
-function speed_GO() {
-    console.log("连接配置",start_server_config);
-    
-    if(start_server_config.id == "" || start_server_config.id == undefined){
-        layer.msg('未选择服务器');
-        return; 
-    }
-    
-    set_speed_code_config(null,start_server_config.id,start_server_config.mode)
-}
-
-function getDelaysByIp(ip) {
-    // 查找匹配的 IP 地址
-    var entry = server_delayData.find(function(entry) {
-        return entry.ip === ip;
-    });
-
-    // 如果找到匹配的条目，则返回延迟数组，否则返回 null
-    return entry ? entry.delays : null;
-}
-
-// 渲染图表
-function networkDelayCanvas_update(ip) {
-    // networkDelayCanvas_(ip,"wintun")
-    networkDelayCanvas_(ip,"")
-}
-
-function networkDelayCanvas_(ip,canvasid) {
-        // 获取Canvas元素
-    var canvas = document.getElementById('networkDelayCanvas_' + ip);
-    try {
-        ctx = canvas.getContext('2d');
-    } catch (error) {
-        // console.error('Error getting 2D context for Canvas:', error);
-        // 这里可以进行其他的错误处理操作，比如使用备用方案或给用户提示
-        return;
-    }
-    
-    // 定义一些参数
-    var numBars = 16; // 竖条数量
-    var barWidth = canvas.width / numBars; // 竖条的宽度
-
-    // 模拟延迟数据
-    var delayValues =  getDelaysByIp(ip);
-    // console.log('延迟数据:',delayValues);
-    
-    // for (var i = 0; i < 100; i++) {
-    //     delayValues.push(Math.random() * 300); // 延迟值在0到300之间随机生成
-    // }
-
-    // 渲染函数
-    function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // 清空Canvas
-
-        // 只绘制最新的50条数据
-        var startIdx = Math.max(0, delayValues.length - numBars);
-        var endIdx = delayValues.length;
-
-        // 绘制竖条
-        for (var i = startIdx; i < endIdx; i++) {
-            var delay = delayValues[i];
-            var height = (delay / 350) * canvas.height; // 将延迟值映射到Canvas高度
-            var color = getColor(delay);
-            ctx.fillStyle = color;
-            ctx.fillRect((i - startIdx) * barWidth, canvas.height - height, barWidth, height);
-        }
-    }
-
-    // 获取颜色
-    function getColor(delay) {
-        var ratio = delay / 350; // 延迟值的比率
-        var r = Math.round(255 * ratio); // 红色分量
-        var g = Math.round(255 * (1 - ratio)); // 绿色分量
-        return 'rgb(' + r + ', ' + g + ', 0)';
-    }
-
-    // 初始化渲染
-    render();
-}
-
-
 
 // 充值页面
 function Pay_page_web(){
@@ -2282,20 +858,20 @@ function Pay_page_web(){
 
 
 // 游戏状态锁定
-function Game_start_animation(a){
-    if(a != 0){
+function Game_start_animation(status) {
+    if (status != 0) {
         $(".home_game_box .box_a .bottom").fadeOut(300);
         $(".home_game_box .box_a .top").fadeOut(300);
-    }else{
+    } else{
         $(".home_game_box .box_a .bottom").fadeIn(300);
         $(".home_game_box .box_a .top").fadeIn(300);
         
-        $(".start_ing").hide();
-        $(".start_ing iframe").prop('src', '');
+        $(".game_starting_shadow").hide();
+        $(".game_starting_shadow iframe").prop('src', '');
     }
 }
 
-function User_login(){
+function ShowLoginPopup(){
     layer.open({
         type: 2,
         title: 'iframe',
@@ -2307,7 +883,7 @@ function User_login(){
         content: 'page/oauth/login_home.php?product=' + getUrlParams().product // iframe 的 url
         ,end: function(){
            console.log('登录页面退出');
-           Game_user_info()
+           UpdateUserInfo()
         }
       });
       
@@ -2324,73 +900,6 @@ function getDataById(data, id) {
     }
     return null; // 如果没有找到匹配的 id，返回 null
 }
-
-
-
-
-
-// 全局鼠标检测
-$("body").on('click', function(event) {
-    // 检测是不是在首页
-    if ($('.home_page').is(':visible')) {
-        $('.back_bottom').css("opacity", "0.4");
-    } else {
-        $('.back_bottom').css("opacity", "0.8");
-    }
-});
-
-
-// 页面切换
-$("[page='home']").on('click', function(event) {
-    $(".app_page").hide();
-    $(".home_page").show();
-    $(".all-game-tab").fadeIn(300);
-    $(".game_search_text").fadeOut(300);
-    $(".game_search").removeClass("game_search-this");
-    game_list_all_transition(0)
-});
-
-// 页面切换
-$("[page='allgame']").on('click', function(event) {
-    $(".app_page").hide();
-    $(".game_page").show();
-});
-
-
-// 网络加速
-$("[page='net_speed']").on('click', function(event) {
-    $(".app_page").hide();
-    $(".net_speed").show();
-});
-
-// 我的+设置
-$("[page='my_set']").on('click', function(event) {
-    $(".app_page").hide();
-    $(".my_set").show();
-});
-
-// 购买套餐
-$("[page='buy_time']").on('click', function(event) {
-    $(".app_page").hide();
-    $(".buy_time").show();
-});
-
-
-// 游戏加速页面
-$("[page='start_game']").on('click', function(event) {
-    document.getElementById("game_bg_video").load();
-    $(".game_img_bg").fadeOut(0);
-    $(".start_game .game_img_bg .MASK").fadeOut(0);
-    $(".app_page").hide();
-    $(".start_game").show(666);
-    $(".game_img_bg").fadeIn(300);
-    $(".start_game .game_img_bg .MASK").fadeIn(3000);
-    
-});
-
-
-
-
 
 function formatSizeUnits(bytes) {
 //   if (bytes < 1024) {
@@ -2495,10 +1004,9 @@ function error_page(data) {
     ipc.send('web_log', `[出现错误] 服务器 Name:` + Server_config.name);
     ipc.send('web_log', `[出现错误] 服务器 ID:` + Server_config.id);
     
-    ipc.send('web_log', `[出现错误] 加速游戏 NAME:` + Game_code_config.name);
-    ipc.send('web_log', `[出现错误] 加速游戏 ID:` + Game_code_config.id);
-    
-    ipc.send('web_log', `[出现错误] 用户 ID:` + user_info_data.id);
+    ipc.send('web_log', `[出现错误] 加速游戏 NAME:` + currentGameSpeedConfig.name);
+    ipc.send('web_log', `[出现错误] 加速游戏 ID:` + currentGameSpeedConfig.id);
+
     ipc.send('web_log', `[出现错误] userAgent:` + navigator.userAgent);
     ipc.send('web_log', `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`);
     
@@ -2597,7 +1105,7 @@ var update_app_lay = null;
 * inurl: 下载地址
 * content1 popup 内润
 * datafile: update_blob 更新文件*/
-function dl_data(inurl, content1, datafile) {
+function DownloadFile(inurl, content1, datafile) {
     
     // 在此处输入 layer 的任意代码
     update_app_lay = layer.open({
@@ -2608,7 +1116,7 @@ function dl_data(inurl, content1, datafile) {
       maxmin: false, // 允许全屏最小化
       anim: 0, // 0-6 的动画形式，-1 不开启
       closeBtn:0,
-      content:content1
+      content: content1
     //   content: `
     //     <div class="update_box">
     //         <h2> 每次的更新,只为更好的体验 </h2>
@@ -2693,7 +1201,7 @@ function dl_data(inurl, content1, datafile) {
                     },100)
                     
                 }
-                if(datafile == "NET_blob"){
+                else if(datafile == "NET_blob") {
                     ipc.send('NET_blob', arrayBuffer);
                     speed_code_test_mode = 2
                     
@@ -2749,7 +1257,7 @@ function dl_data(inurl, content1, datafile) {
 
 
 // 加速平台
-$.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=host_speed&user_code="+ user_code()).done(function(data) {
+$.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=host_speed&user_code="+ GetUserToken()).done(function(data) {
     net_speed_json = data
     // 批量吧所有配置设置成0
     net_speed_json.forEach(service => {
@@ -2987,7 +1495,7 @@ function my_set_page(){
 
 
 function Logout(){
-    stop_speed()
+    stop_speed();
     localStorage.setItem('user_code', "");
     $("[page='home']").trigger("click");
 }
@@ -2996,21 +1504,7 @@ function buy_time_page(){
     $("[page='buy_time']").trigger("click");
 }
 
-// 用户设置切换
-$(".my_set [page='my_user']").on('click', function(event) {
-    $(".my_set .my_set_page").hide();
-    $(".my_set .my_user").show();
-});
 
-$(".my_set [page='sys_set']").on('click', function(event) {
-    $(".my_set .my_set_page").hide();
-    $(".my_set .sys_set").show();
-});
-
-$(".my_set [page='fix']").on('click', function(event) {
-    $(".my_set .my_set_page").hide();
-    $(".my_set .fix").show();
-});
 
 // 内嵌网页
 $(".my_set [page='iframe_aff']").on('click', function(event) {
@@ -3063,39 +1557,6 @@ $(".my_set .iframe iframe").on("load", function() {
 });
 
 
-$(".stop_speed_hover_jq").hover(function(){
-    $(".stop_speed_hover").css("opacity", 1);
-    $(".stop_speed").css("opacity", 0);
-    
-
-    
-},function(){
-    $(".stop_speed_hover").css("opacity", 0);
-    $(".stop_speed").css("opacity", 1);
-});
-
-
-
-$(".my_set_page .reset_lsp").on('click', function(event) {
-    app_fix(".my_set_page .reset_lsp")
-});
-
-$(".my_set_page .reset_nf2").on('click', function(event) {
-    app_fix(".my_set_page .reset_nf2")
-        ipc.send('speed_code_config_exe', "nf2_install");
-});
-
-$(".my_set_page .reset_tun").on('click', function(event) {
-    app_fix(".my_set_page .reset_tun")
-        ipc.send('speed_code_config_exe', "wintun_install");
-});
-
-$(".my_set_page .net_test").on('click', function(event) {
-    ipc.send('test_baidu');
-});
-
-
-
 
 
 var fix_schedule = 0
@@ -3108,7 +1569,7 @@ function app_fix(css){
     
     
         // 检测有没有游戏在加速
-    if(Game_starting_id != 0){
+    if(currentGameID != 0){
         layer.msg('有其他游戏正在加速！\n无法修复！');
         return; 
     }
@@ -3136,7 +1597,52 @@ function Ticket_MSG(){
       anim: -1,
       skin: 'class-layer-style-01',
       area: ['800px', '600px'],
-      content: 'https://api.jihujiasuqi.com/apps/Ticket_new/?&user_code='+user_code()+'&product='+  getUrlParams().product 
+      content: 'https://api.jihujiasuqi.com/apps/Ticket_new/?&user_code='+GetUserToken()+'&product='+  getUrlParams().product 
     });
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+// NEW AERA!
+$(function() {
+    $("[page='home']").trigger("click");
+    $(".app_page").css("opacity", 1.0);
+});
+
+
+let gameAll = Api.getGameList();
+let home_game_list_max = 4;
+
+$(document).ready(function() {
+    LoadGameList(gameAll);
+    if (!GetUserToken()) {
+        console.log("账号未登录,不加载历史游戏,加载热门游戏");
+        LoadHomePageGames(gameAll, home_game_list_max, false);
+    } else {
+        console.log("账号已登录 " , GetUserToken());
+        UpdateUserInfo();
+        LoadGameHistory();
+        // 循环更新用户数据
+        setInterval(function() {
+                UpdateUserInfo();
+        }, 1000 * 30);
+    }
+});
+
+
+// 查找出问题的图片
+$('.home_game_box img').on('error', function() {
+    console.log("游戏图片出现问题" , this.src );
+    // layer.msg('图片下载出现问题<br>' + this.src);
+});

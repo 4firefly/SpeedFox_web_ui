@@ -350,7 +350,12 @@ else {
     // oem_js
   <? echo $productdata["oem_js"]?>
   </script>
-  <script src="static/js/constants.js?<?echo $debug;?>"></script>
+  <script src="static/js/helper/api.js?<?echo $debug;?>"></script>
+  <script src="static/js/helper/listeners.js?<?echo $debug;?>"></script>
+  <script src="static/js/helper/files.js?<?echo $debug;?>"></script>
+  <script src="static/js/server.js?<?echo $debug;?>"></script>
+  <script src="static/js/speed.js?<?echo $debug;?>"></script>
+  <script src="static/js/history.js?<?echo $debug;?>"></script>
   <script src="static/js/sys.js?<?echo $debug;?>"></script>
   
   <script src="static/js/script.js?<?echo $debug;?>"></script>
