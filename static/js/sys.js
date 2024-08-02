@@ -13,21 +13,41 @@ $('#LogoutBtn').on('click', function () {
     Logout();
 });
 
-// 跳转到全部游戏或者切换回去
+/*
+* 外部打开 url
+* url: 需要打开的 url
+* */
 function open_url(url) {
     shell.openExternal(url);
 }
 
+/*
+* 获取 url 参数
+* 缺点：每次都循环一次
+* */
+function getUrlParams() {
+    var params = {};
+    var queryString = window.location.search.substring(1);
+    var regex = /([^&=]+)=([^&]*)/g;
+    var match;
 
-var Framework // 基座变量
+    while (match = regex.exec(queryString)) {
+        params[decodeURIComponent(match[1])] = decodeURIComponent(match[2]);
+    }
+    return params;
+}
+
+// OEM 设置
+let oem_config  = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=get_oem&product=" + getUrlParams().product);
+$('.nav .logo').attr('src', oem_config.logo);
+
+let Framework;
+
+let Server_list_layui_box
 
 
-// 服务器弹层变量
-var Server_list_layui_box
 
-
-
-document.addEventListener('keydown', function(event) {
+/*document.addEventListener('keydown', function(event) {
     // 禁用 F12 打开开发者工具
     if (event.key === 'F12') {
         event.preventDefault();
@@ -41,70 +61,43 @@ document.addEventListener('keydown', function(event) {
         ((event.ctrlKey && event.key === 'R') || event.key === 'F5')) {
         event.preventDefault();
     }
-});
+});*/
 
 $(function() {
     $("[page='home']").trigger("click");
-    // 向后端发送指令，告诉后端，可以关闭加载动画了
-    setTimeout(() => {
-        ipc.send('loadingWindow', 'hide');
-        if(getUrlParams().silent != "true"){
-            app_window('show');
-        }
-    }, 1000);
-    // 清除host
+    ipc.send('loadingWindow', 'hide');
+    if(getUrlParams().silent !== "true") {
+        app_window('show');
+    }
+    ipc.send('speed_code_config', {"mode" : "taskkill"});
     ipc.send('batchRemoveHostRecords');
-    
     // 加载首页滚动图
-    render_home() 
-})
+    render_home();
+});
 
 
-
-// 接收主进程的消息
 ipc.on('Framework', (event, message) => {
     Framework = message
-    ipc.send('speed_code_config', {"mode" : "taskkill"});
-    console.log('主线程发送信息:', Framework);
-    console.log('基座版本:', Framework.version);
-    
     re = new RegExp('Chrome/(.+?) ');
     Framework.appVersion = re.exec(navigator.appVersion)[1];
-    
-    Framework.sysjs = 202406240430
-    
-    
-    $(".Framework").html("基座版本:" + Framework.version + " &nbsp;&nbsp;&nbsp;&nbsp;内核版本:" + Framework.appVersion  + " &nbsp;&nbsp;&nbsp;&nbsp;SYS.JS版本:" + Framework.sysjs  + " &nbsp;&nbsp;&nbsp;&nbsp;" +  `<Dev onclick="app_window('openDevTools')"> 点击打开控制台</Dev>`);
-    
-    
+    $(".Framework").html(`程序版本: ${Framework.version} 内核版本: ${Framework.appVersion} SYS.JS 版本: ${SYS_JS_VERSION}`);
 
-    
-    if(oem_config.up_version != Framework.version){
-        console.log('版本不匹配,需要更新:', Framework.version);
-        
-        if(oem_config.up_url == ""){
-            console.log('无下载url');
-            return
-        }   
-        
-         content = `
+    // new version
+    if (oem_config.up_version !== Framework.version) {
+        if (oem_config.up_url == "") {
+            return;
+        }
+         let content = `
             <div class="update_box">
-                
-                ` + oem_config.up_content + `
-             
+                ${oem_config.up_content}
                 <p class="dl1">0 B/s</p>
                 <p class="dl2">0%</p>
                 <div class="layui-progress " lay-showpercent="true">
                   <div class="layui-progress-bar layui-bg-blue" ></div>
                 </div>
-            </div>`
-            
-
-        
-        
-        dl_data(oem_config.up_url,content,"update_blob")
-    }else{
-        // 测试核心能不能用
+            </div>`;
+        dl_data(oem_config.up_url, content, "update_blob");
+    } else {
         ipc.send('speed_code_test');
     }
 });
@@ -112,17 +105,14 @@ ipc.on('Framework', (event, message) => {
 ipc.on('selected-file', (event, message) => {
     console.log('路径选择:',message[0] ,"游戏id" , gameconfig.id);
     
-    if(message[0] == "undefined" || message[0] == undefined){
-        
+    if (!message[0] || message[0] == undefined || message[0] == '') {
       layer.tips('设置路径错误！', '.set_game_user',{
         tips: [2,'#ff5722']
       });
-        
         return; 
     }
-    
-    localStorage.setItem('*start_game_'+gameconfig.id , message[0]);
-    layer.tips('设置成功！', '.set_game_user',{
+    localStorage.setItem('start_game_'+gameconfig.id , message[0]);
+    layer.tips('设置成功！', '.set_game_user', {
         tips: [2,'#16b777']
       });
 });
@@ -130,17 +120,16 @@ ipc.on('selected-file', (event, message) => {
 
 
 function start_game_user() {
-    game_start = localStorage.getItem('*start_game_'+gameconfig.id)
-    console.log('路径:',game_start ,"游戏id" , gameconfig.id);
-    
-    
-    if(game_start == "undefined" || game_start == undefined){
+    let game_start_path = localStorage.getItem('start_game_'+gameconfig.id)
+
+
+    if (!game_start_path[0] || game_start_path[0] == undefined || game_start_path[0] == '') {
         ipc.send('user_get_exe');
         return; 
     }
-    
-    ipc.send('user_start_exe',game_start);
-    layer.tips('正在启动游戏！', '.start_game_user',{
+    console.log('路径:',game_start_path ,"游戏id" , gameconfig.id);
+    ipc.send('user_start_exe', game_start_path);
+    layer.tips('正在启动游戏！', '.start_game_user', {
         tips: [1,'#16b777']
       });
 }
@@ -160,7 +149,7 @@ $(document).on("mousewheel DOMMouseScroll", function (event) {
     var delta = (event.originalEvent.wheelDelta && (event.originalEvent.wheelDelta > 0 ? 1 : -1)) ||  // chrome & ie
                 (event.originalEvent.detail && (event.originalEvent.detail > 0 ? -1 : 1));              // firefox
     
-    if(DOMMouseScroll_lock){
+    if (DOMMouseScroll_lock) {
         return; 
     }
     
@@ -244,12 +233,6 @@ function moveLastToFirst(arr) {
         }
         return arr;
     }
-
-// 接收主进程的消息
-ipc.on('checkUpdate_ipc', (event, message) => {
-    console.log('更新信息:', message);
-});
-
 
 // 接收主进程的消息(加速状态)
 var socksok = {}
@@ -930,17 +913,7 @@ function Game_history_del(id) {
 
 
 
-function getUrlParams() {
-    var params = {};
-    var queryString = window.location.search.substring(1);
-    var regex = /([^&=]+)=([^&]*)/g;
-    var match;
 
-    while (match = regex.exec(queryString)) {
-        params[decodeURIComponent(match[1])] = decodeURIComponent(match[2]);
-    }
-    return params;
-}
 
 
 
@@ -1262,9 +1235,7 @@ if(getUrlParams().demo_watermark){
 // });
 
 
-var oem_config  = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=get_oem&product=" + getUrlParams().product)
-$('.nav .logo').attr('src', oem_config.logo);
-console.log("oem信息",oem_config);
+
 
 
 var Game_list_json = get_JSON(API_SERVER_ADDRESS+"/api/v2/?mode=game_list&product=" + getUrlParams().product)
@@ -2621,8 +2592,12 @@ async function blobToBuffer(blob) {
 }
 
 
-var update_app_lay = null
-function dl_data(inurl,content1,datafile) {
+var update_app_lay = null;
+/*
+* inurl: 下载地址
+* content1 popup 内润
+* datafile: update_blob 更新文件*/
+function dl_data(inurl, content1, datafile) {
     
     // 在此处输入 layer 的任意代码
     update_app_lay = layer.open({
