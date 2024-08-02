@@ -102,7 +102,7 @@ function start_game_user() {
     let game_start_path = localStorage.getItem('start_game_'+currentGameInfo.id)
 
 
-    if (!game_start_path[0] || game_start_path[0] == undefined || game_start_path[0] == '') {
+    if (!game_start_path) {
         ipc.send('user_get_exe');
         return; 
     }
@@ -666,7 +666,6 @@ function pc_uuid() {
 
 // 获取用户 user_code
 function GetUserToken() {
-    
     user_code_str = localStorage.getItem('user_code');
     if(localStorage.getItem('user_code') == null){
         return false;
@@ -680,6 +679,8 @@ function UpdateUserInfo() {
     if(res.response == "ERR") {
         localStorage.setItem('user_code', "");
         console.log("用户信息丢失，强制下号");
+        $('.my_user .username').text("未登录");
+        $('.my_user .UID').text("未登录");
         if (currentGameID + 0  != 0) {
             stop_speed();
         }
@@ -763,13 +764,7 @@ ipc.on('socks_connect_test', (event, message) => {
 });
 
 
-function updateConnectionStatusIcon() {
-    if(socksTestResult.TCP && socksTestResult.udp){
-        $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
-    }else{
-        $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
-    }
-}
+
 
 $(".start_game .box .server_info .udp_ico").on('click', function(event) {
     ipc.send('socks_connect_test');// 测试udp

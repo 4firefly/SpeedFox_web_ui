@@ -241,8 +241,8 @@ else {
                 
                 <img src="https://api.jihujiasuqi.com/app_ui/pc/static/img/avater.png" class="avater">
                 <img src="https://api.jihujiasuqi.com/up_img/Cards/2.gif" class="cards"><!--  可能占用cpu ~0.1 -->
-                <p class="username">获取用户名失败</p>
-                <p class="UID">UID 获取失败</p>
+                <p class="username">未登录</p>
+                <p class="UID">未登录</p>
                 
                 <button class="layui-btn layui-btn-primary layui-border-red layui-btn-sm Logout" id="LogoutBtn">退出登录</button>
                 

@@ -9,7 +9,7 @@ class SFApi {
     let JSONdata;
     new_url.searchParams.append('product', this.product);
     if (sign) {
-      new_url.searchParams.append('user_code', this.token);
+      new_url.searchParams.append('user_code', this.getToken());
     }
     new_url = new_url.href.toString();
     $.getJSON({ async: false, url: new_url })
@@ -24,6 +24,9 @@ class SFApi {
   }
   setToken (token) {
     this.token = token;
+  }
+  getToken () {
+    return localStorage.getItem('user_code');
   }
   getUserInfo() {
     let res = this._getJSON(
