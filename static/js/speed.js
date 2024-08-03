@@ -1,7 +1,9 @@
 let currentGameID = 0;
-
 let isSocksReady = false;
-
+let UploadUserBDTimer = 5;
+let GameStartSpeedTimer;
+let socksTestResult = [];
+let HostSpeedList;
 ipc.on('speed_code', (event, message) => {
   console.log('主线程发送信息:', message);
 
@@ -79,11 +81,37 @@ ipc.on('speed_code', (event, message) => {
 
 });
 
+ipc.on('socks_connect_test', (event, message) => {
+    console.log(`连接检测 `, message)
+  
+    if (message.includes("UDP: OK")) {
+      layer.msg('UDP 连接正常', {
+        offset: 'b',
+        anim: 'slideUp'
+      });
+      ipc.send('web_log', `UDP 连接正常 `);
+      socksTestResult.udp = true;
+    }
+    if (message.includes("TCP: OK")) {
+      layer.msg('TCP 连接正常', {
+        offset: 'b',
+        anim: 'slideUp'
+      });
+      ipc.send('web_log', `TCP 连接正常 `);
+      socksTestResult.TCP = true;
+    }
+    updateConnectionStatusIcon();
+  });
+
 function startSpeedUp() {
     if (serverConnectionConfig.id == "" || serverConnectionConfig.id == undefined) {
         layer.msg('未选择服务器');
         return; 
     }
+    HostSpeedList = Api.getHostList();
+    HostSpeedList.forEach(service => {
+        service.start = 0;
+    });
     sendGameConfig(currentGameSpeedConfig.id, serverConnectionConfig.id, serverConnectionConfig.speedMode);
   }
 
@@ -92,9 +120,11 @@ function startSpeedUp() {
 
     Server_config = null;
     $("[game_now_starting_id='"+gameid+"']").show();
+    // ???
+    let Game_start_iframe = "page/load/";
     $("[game_now_starting_id='"+gameid+"'] iframe").prop('src', Game_start_iframe);
     currentGameID = gameid;
-    Game_start_animation(1);
+    updateGameStartAnim(1);
 
 
     GameStartSpeedTimer = setTimeout(function() {
@@ -149,7 +179,7 @@ function startSpeedUp() {
 }
 
 function updateConnectionStatusIcon() {
-  if(socksTestResult.TCP && socksTestResult.udp){
+  if (socksTestResult.TCP && socksTestResult.udp) {
       $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
   }else{
       $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
@@ -198,17 +228,49 @@ function buildV2Config (Server_config) {
     return v2config;
 }
 
+function stop_speed() {
+    console.log(`停止加速 `)
+    ipc.send('speed_code_config', { "mode": "taskkill" });
+  
+    $("[start_gameid='" + currentGameID + "']").hide();
+    currentGameID = 0
+  
+    start_speed_time = $('.start_game .box .stop_speed time').text();
+    // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <p style='position: fixed;top: -34px;'>已停止加速！</p> <p style='position: absolute;top: 10px;font-size: 12px;'>加速时长:" + start_speed_time + "</p>"});
+  
+    // 奶奶的为啥清理不掉，多清理亿轮
+    clearTimeout(GameStartSpeedTimer);
+    updateGameStartAnim(0);
+    $('.start_game .box .stop_speed').html("正在停止...")
+    $(".start_game .box .stop_speed_hover").html("正在停止...")
+    clearInterval(MonitorInterval); // 清理定时器
+    setTimeout(() => {
+      delayValues = []
+      $("[page='home']").trigger("click");
+      $('.start_game .box .stop_speed').html(
+        '<i class="layui-icon layui-icon-radio"></i> 加速中:<time></time>')
+      $(".start_game .box .stop_speed_hover").html(
+        '<i class="layui-icon layui-icon-radio"></i> 停止加速')
+    }, 1000 * 2);
+  
+    // 批量吧所有配置设置成0 host
+    HostSpeedList.forEach(service => {
+      service.start = 0;
+    });
+    ipc.send('batchRemoveHostRecords');
+}
+
 /**
  * 
  * @param {String} platform 
  * @param {number} turnStatus 
  */
 function SpeedHost(platform, turnStatus) {
-  $(`.net_speed_list_button_${platform}`).hide()
-  $(`[lay-filter='net_speed_list_progress_`+platform+`']`).show()
+  $(`.net_speed_list_button_${platform}`).hide();
+  $(`[lay-filter='net_speed_list_progress_`+platform+`']`).show();
   layui.element.progress('net_speed_list_progress_'+platform, "100%");
   
-  host_speed_json.forEach(service => {
+  HostSpeedList.forEach(service => {
       if (service.code === platform) {
           service.start = turnStatus;
       }
@@ -244,7 +306,7 @@ function updateHosts() {
   let host = "";
   $(".start_game .box .pt_list").html("") // 清除加速页面已同时加速的列表
   
-  host_speed_json.forEach(service => {
+  HostSpeedList.forEach(service => {
       if (service.start === 1) {
           host = host + service.host
           $(".start_game .box .pt_list").append(`
@@ -316,7 +378,7 @@ function ShowHostPopup(){
 function RenderHostPopup() {
     $(".start_game .box .pt_list .pt_box .add").show()
     $(".net_speed_list").html("")
-    $.each(host_speed_json, function(i, field) {
+    $.each(HostSpeedList, function(i, field) {
         let net_speed_list_start_mod_html;
         if(field.start == 0){
             net_speed_list_start_mod_html = `
@@ -390,3 +452,15 @@ ipc.on('proxy_bd_data', (event, message) => {
       );
   }
 });
+
+function updateGameStartAnim(status) {
+  if (status != 0) {
+    $(".home_game_box .box_a .bottom").fadeOut(300);
+    $(".home_game_box .box_a .top").fadeOut(300);
+  } else {
+    $(".home_game_box .box_a .bottom").fadeIn(300);
+    $(".home_game_box .box_a .top").fadeIn(300);
+    $(".game_starting_shadow").hide();
+    $(".game_starting_shadow iframe").prop('src', '');
+  }
+}

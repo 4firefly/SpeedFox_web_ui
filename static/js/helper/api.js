@@ -47,6 +47,12 @@ class SFApi {
       false);
     return res;
   }
+  getHostList() {
+    let res = this._getJSON(
+      `${this.host}/api/v2/?mode=host_speed`,
+      true);
+    return res;
+  }
   getGameConfig(gameid) {
     let res = this._getJSON(
       `${this.host}/api/v2/?mode=game_config&id=${gameid}`,

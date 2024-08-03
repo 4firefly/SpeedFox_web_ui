@@ -26,9 +26,9 @@ function CheckandPopupServerList(id, mode) {
   }
   
   // 检测有没有修复
-  if(fix_schedule != 0){
+  if (fix_schedule != 0) {
       layer.msg('正在修复组件,请等待修复完成');
-      return
+      return;
   }
   
   addGameHistory(id);
@@ -47,7 +47,15 @@ function CheckandPopupServerList(id, mode) {
  * @returns null
  */
 function ShowChooseServerPopup(gameid) {
-  currentGameInfo = getDataById(gameAll, gameid+"");
+  function getDataById(data, id) {
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].id === id) {
+        return data[i];
+      }
+    }
+    return null; // 如果没有找到匹配的 id，返回 null
+  }
+  currentGameInfo = getDataById(allGamesList, gameid+"");
 
   oChooseServerPopup = layer.open({
       type: 1,
