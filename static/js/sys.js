@@ -324,49 +324,7 @@ function StartMonitor() {
 let UploadUserBDTimer = 5
 
 
-// 流量信息通道 bd=bandwidth
-ipc.on('proxy_bd_data', (event, message) => {
-    try {
-        message = $.parseJSON(message);
-    } catch {
-        return;
-    }
 
-    console.log(message["Bandwidth"]["speed"], message["Bandwidth"]["traffic"] , "下次上报速度" , UploadUserBDTimer);
-
-    Start_speed_outputBytes_html_out = message["Bandwidth"]["traffic"];
-    Start_speed_Bytes_speed_html_out = message["Bandwidth"]["speed"];
-
-    // Start_speed_outputBytes_html_out = Start_speed_outputBytes_html_out - 5120
-
-    if(Start_speed_outputBytes_html_out < 0){
-        Start_speed_outputBytes_html_out = 0
-    }
-    
-    $("Start_speed_outputBytes_html").text(formatSizeUnits(Start_speed_outputBytes_html_out).split(" ")[0]) // 加速流量
-    $(".start_game .box .ping .outputBytes mini").text(formatSizeUnits(Start_speed_outputBytes_html_out).split(" ")[1]) // 加速流量
-    
-    
-    $("Start_speed_Bytes_speed_html").text(bytesToSize(Start_speed_Bytes_speed_html_out).split(" ")[0]) // 当前速度
-    $(".start_game .box .ping .Bytes_speed mini").text(bytesToSize(Start_speed_Bytes_speed_html_out).split(" ")[1]) // 当前速度
-
-    // 上报流量和速度
-    UploadUserBDTimer --
-
-    if(UploadUserBDTimer < 0 && isSocksReady){
-        UploadUserBDTimer = 12;
-        // console.log('上报服务器速度',speed_session_id);
-        Api.uploadUserData(
-            speed_session_id,
-            Server_config.id,
-            currentGameInfo.id,
-            Start_speed_Bytes_speed_html_out,
-            Start_speed_outputBytes_html_out,
-            server_ping_ms,
-            Framework.version
-        );
-    }
-});
 
 
 // 更新延迟数据
