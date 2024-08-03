@@ -1,4 +1,4 @@
-const { ipcRenderer: ipc, shell } = require('electron');
+// const { ipcRenderer: ipc, shell } = require('electron');
 const API_SERVER_ADDRESS = "https://api.jihujiasuqi.com";
 const SYS_JS_VERSION = 202406240430;
 
@@ -214,97 +214,9 @@ function moveLastToFirst(arr) {
     }
 
 // 接收主进程的消息(加速状态)
-var socksok = {};
 let GameStartSpeedTimer = null;
-var msg_from_kernel = null;
 
-var speed_code_get_newdata = 0
-ipc.on('speed_code', (event, message) => {
-    console.log('主线程发送信息:', message);
-    msg_from_kernel = message;
-    // TODO: deprecated
-    if(message.tag == "net_speed_start"){
-        console.log('来自host模块的socks测试信息:', message);
-        if(message.start == "SOCKS OK"){
-            console.log('来自host模块的socks测试 - 成功！');
-            $(".start_game .box .pt_list .pt_box .layui-icon").hide()
-            net_speed_list()
-            layer.close(net_speed_layui_box)
-        }
-        return;
-    }
 
-    if(message.start == "SOCKS OK"){
-        isSocksReady = true;
-        clearTimeout(GameStartSpeedTimer);
-        speed_session_id = generateUniqueID();
-        StartMonitor(); // 更新数据
-        ShowSpeedInfo();
-        setTimeout(() => {
-            // $("[page='start_game']").trigger("click");
-            console.log('加速成功,跳转页面:', currentGameID);
-
-            // 上升优先级
-            ipc.send('high_priority', "sniproxy.exe");
-            ipc.send('high_priority', "SpeedNet.exe");
-            ipc.send('high_priority', "SpeedProxy.exe");
-            ipc.send('high_priority', "SpeedMains.exe");
-            ipc.send('high_priority', "SpeedFox.tun2socks.exe");
-
-            // 遮罩 实时延时
-            $("[start_gameid='"+currentGameID +"']").show();
-            
-            $("[game_now_starting_id='"+currentGameID +"']").hide();
-            $("[game_now_starting_id='"+currentGameID +"'] iframe").prop('src', '');
-
-            if(currentGameSpeedConfig.config_host.includes("**")){
-                starthost = currentGameSpeedConfig.config_host.split("\r\n");
-                // starthost = starthost.replaceAll("*","");
-                console.log('检测到需要加速的host 数组',starthost);
-                for (var i = 0; i < starthost.length; i++) {
-                    starthostdata = starthost[i].replaceAll("*","");
-                    console.log('检测到需要加速的host 数组', starthostdata);
-                    net_speed_set(starthostdata,1)
-                }
-            }
-        }, 1000);
-    }
-    
-    if(message.start == "SOCKS ERR"){
-        clearTimeout(GameStartSpeedTimer);
-        stop_speed();
-        var r = confirm("当前服务器不可用,请尝试更换其他服务器\n\n\n服务器链接失败，要查看日志么?");
-        if (r == true) {
-            error_page("服务器检测连通性失败")
-        }
-        return;
-    }
-    // show error log
-    if (message.start == "log") {
-        $(".error_log").html(message.log);
-        return;
-    }
-
-    if(message.id == "SpeedProxy_OK"){
-      if(!isSocksReady){
-            ipc.send('speed_code_config', {"mode" : "socks_test"});
-            ipc.send('socks_connect_test');// 测试udp
-            updateConnectionStatusIcon()
-            socksTestResult = []
-      }
-      
-    }
-  
-    if(message.start == "close"){
-        if(currentGameID == 0){
-            // 正常停
-            console.log('进程停止(正常)');
-            return;
-        }
-        console.log('进程意外终止!(在游戏加速中丢失)');
-    }
-  
-});
 
 // 返回ping数据
 ipc.on('ping-reply', (event, message) => {
@@ -357,7 +269,6 @@ function formatTime(seconds) {
 // 开始加速,更新数据
 let MonitorInterval;
 
-var msg_from_kernel_json = []
 function StartMonitor() {
     let MonitorStartTime;
     let code_onlineok;
@@ -384,7 +295,7 @@ function StartMonitor() {
             speed_code_msg_json = $.parseJSON(msg_from_kernel);
         }catch(err) {}
         
-        if (serverConnectionConfig.mode == "nf2_start") {
+        if (serverConnectionConfig.speedMode == "nf2_start") {
             code_onlineok = false
             // nf2组件重点关照
             try {
@@ -398,7 +309,7 @@ function StartMonitor() {
                 }
             }catch(err) {}
         }
-       else if (serverConnectionConfig.mode == "wintun_start") {
+       else if (serverConnectionConfig.speedMode == "wintun_start") {
            code_onlineok = true;
        }
         
@@ -442,7 +353,7 @@ ipc.on('proxy_bd_data', (event, message) => {
     // 上报流量和速度
     UploadUserBDTimer --
 
-    if(UploadUserBDTimer < 0){
+    if(UploadUserBDTimer < 0 && isSocksReady){
         UploadUserBDTimer = 12;
         // console.log('上报服务器速度',speed_session_id);
         Api.uploadUserData(
@@ -677,7 +588,7 @@ function GetUserToken() {
 function UpdateUserInfo() {
     let res = Api.getUserInfo();
     if(res.response == "ERR") {
-        localStorage.setItem('user_code', "");
+        localStorage.removeItem('user_code');
         console.log("用户信息丢失，强制下号");
         $('.my_user .username').text("未登录");
         $('.my_user .UID').text("未登录");
@@ -747,14 +658,12 @@ ipc.on('socks_connect_test', (event, message) => {
     console.log(`连接检测 `,message)
     
     if(message.includes("UDP: OK")){
-        console.log(`UDP 连接正常 `)
         layer.msg('UDP 连接正常', {offset: 'b',anim: 'slideUp'});
         ipc.send('web_log', `UDP 连接正常 `);
         socksTestResult.udp = true
     }
     
     if(message.includes("TCP: OK")){
-        console.log(`TCP 连接正常 `)
         layer.msg('TCP 连接正常', {offset: 'b',anim: 'slideUp'});
         ipc.send('web_log', `TCP 连接正常 `);
         socksTestResult.TCP = true
@@ -813,7 +722,7 @@ function stop_speed() {
     
     
     // 批量吧所有配置设置成0 host
-    net_speed_json.forEach(service => {
+    host_speed_json.forEach(service => {
             service.start = 0;
     });
     ipc.send('batchRemoveHostRecords');
@@ -866,7 +775,7 @@ function Game_start_animation(status) {
     }
 }
 
-function ShowLoginPopup(){
+function ShowLoginPopup() {
     layer.open({
         type: 2,
         title: 'iframe',
@@ -878,7 +787,7 @@ function ShowLoginPopup(){
         content: 'page/oauth/login_home.php?product=' + getUrlParams().product // iframe 的 url
         ,end: function(){
            console.log('登录页面退出');
-           UpdateUserInfo()
+           UpdateUserInfo();
         }
       });
       
@@ -1253,9 +1162,9 @@ function DownloadFile(inurl, content1, datafile) {
 
 // 加速平台
 $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=host_speed&user_code="+ GetUserToken()).done(function(data) {
-    net_speed_json = data
+    host_speed_json = data
     // 批量吧所有配置设置成0
-    net_speed_json.forEach(service => {
+    host_speed_json.forEach(service => {
             service.start = 0;
     });
     
@@ -1264,86 +1173,6 @@ $.getJSON(API_SERVER_ADDRESS+"/api/v2/?mode=host_speed&user_code="+ GetUserToken
     console.log("【host_speed】请求失败" + error,status,xhr);
     layer.msg('[host_speed] 数据请求失败 <br>返回码:' + xhr.status);
 });
-
-var net_speed_layui_box
-function net_speed(){
-    net_speed_layui_box = layer.open({
-        type: 1,
-        shadeClose: true,
-        shade: 0.8,
-        anim: -1,
-        skin: 'class-layer-style-01',
-        area: ['850px', '550px'],
-        content:`
-            <div class="net_speed_page_body">
-                <h2 class="title">平台加速</h2>
-                <!-- 平台列表 -->
-                <div class="net_speed_list">
-                
-                    <!-- <div class="net_speed_list_data">
-                        <img class="ico" src="https://api.jihujiasuqi.com/up_img/ico/steam_black_logo_icon_147078.png" class="avater">
-                        <div class="title1">Sbeam游戏中心</div>
-                        <button type="button" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue layui-btn-sm net_speed_list_button">
-                            <i class="layui-icon layui-icon-release"></i> 
-                            开始加速
-                        </button>
-                    </div> -->
-                
-                
-                </div>
-                
-            </div>
-    `,end: function(){
-    console.log('平台加速页面已移除');
-  }
-    });
-    
-    net_speed_list()
-}
-
-// 加载加速状态列表
-function net_speed_list(){
-    $(".start_game .box .pt_list .pt_box .add").show()
-    $(".net_speed_list").html("")
-    $.each(net_speed_json, function(i, field){
-        
-        if(field.start == 0){
-            net_speed_list_start_mod_html = `
-                <button type="button" class="layui-btn layui-btn-lg layui-btn-primary layui-border-blue layui-btn-sm net_speed_list_button net_speed_list_button_`+field.code+`" onclick="net_speed_set('`+ field.code +`',1)">
-                    <i class="layui-icon layui-icon-release"></i> 
-                    开始加速
-                </button>
-            
-            `
-        }else{
-            net_speed_list_start_mod_html = `
-                <button type="button" class="layui-btn layui-btn-lg layui-btn-primary layui-border-red layui-btn-sm net_speed_list_button net_speed_list_button_`+field.code+`" onclick="net_speed_set('`+ field.code +`',0)">
-                    <i class="layui-icon layui-icon-release"></i> 
-                    停止加速
-                </button>
-            
-            `
-        }
-        
-        
-        $(".net_speed_list").append(`
-                    <div class="net_speed_list_data">
-                        <img class="ico" src="https://api.jihujiasuqi.com/up_img/`+field.ico+`" class="avater">
-                        <div class="title1">` + field.name + `</div>
-                        `+net_speed_list_start_mod_html+`
-                        <div class="layui-progress" lay-filter="net_speed_list_progress_`+field.code+`">
-                          <div class="layui-progress-bar layui-bg-blue" lay-percent="1%"></div>
-                        </div>
-                    </div>
-        `);
-        
-        layui.element.render('net_speed_list_progress_'+field.code, 'net_speed_list_progress_'+field.code);
-        
-    })
-}
-
-
-
 
 const alphabet_key = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -1365,116 +1194,6 @@ function decodeStringToNumber(string) {
     return decoded;
 }
 
-// 示例用法
-// let number = 1234567890;
-// let encodedString = encodeNumberToString(number);
-// console.log(encodedString); // 输出: Kq3W4
-
-// let decodedNumber = decodeStringToNumber(encodedString);
-// console.log(decodedNumber); // 输出: 1234567890
-
-
-
-
-
-
-
-// 设置加速状态 net_speed_set(平台,模式0关1开)
-function net_speed_set(mode,open){
-    $(".net_speed_list_button_"+mode).hide()
-    $(`[lay-filter='net_speed_list_progress_`+mode+`']`).show()
-    layui.element.progress('net_speed_list_progress_'+mode, "100%");
-    
-    net_speed_json.forEach(service => {
-        if (service.code === mode) {
-            service.start = open;
-        }
-    });
-    net_speed_set_start(open)
-    
-    if(open == 0){
-        console.log('关闭不走流程，直接刷新');
-        net_speed_list()
-    }
-    
-}
-function net_speed_set_start(open){
-    
-    // 先删老host
-    ipc.send('batchRemoveHostRecords');
-    
-    
-    // 启动平台加速网络
-    //ws://ws1.cloudflare.foxcloud.asia:8080?path=/ws
-    ipc.send('host_speed_start', {"f" : "ws://ws1.cloudflare.foxcloud.asia:8080?path=/ws"});
-    
-    // 启动host服务器
-    ipc.send('speed_code_config', {"mode" : "sniproxy"});
-    
-    // 测试socks
-     var socks_test  =
-        {
-            "tag" : "net_speed_start",
-            "server" : "127.114.233.8:16789",
-        };
-    ipc.send('socks_test', socks_test);
-    
-    host = ""
-    $(".start_game .box .pt_list").html("") // 清除加速页面已同时加速的列表
-    
-    net_speed_json.forEach(service => {
-        if (service.start === 1) {
-            host = host + service.host
-            $(".start_game .box .pt_list").append(`
-            
-                <div class="pt_box">
-                    <img src="https://api.jihujiasuqi.com/up_img/`+service.ico+`" title="`+service.name+`">
-                    <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 
-                </div>
-            
-            `)
-        }
-    });
-    
-    $(".start_game .box .pt_list").append(`
-               <div class="pt_box" onclick="net_speed()">
-                    <i class="layui-icon layui-icon-add-1 add" style="position: relative;top: 4px;left: -3px;font-size: 24px;margin-left: 0px;"></i> 
-                </div>
-            `)
-    
-    
-
-    const host_dataArray = host.split("\r\n");
-    
-    
-    if(host_dataArray.length == 0 || host_dataArray[0] == ""){
-        console.log('无host可配置',host_dataArray.length);
-        // 删老host
-        ipc.send('batchRemoveHostRecords');
-        return;
-    }
-    console.log('需要配置的host',host_dataArray,"数量",host_dataArray.length);
-    // 配置黑名单host,加快加载速度
-    const hostrecordsToAdd = [
-                { ip: '0.0.0.0', hostname:"www.youtube.com"},
-                { ip: '0.0.0.0', hostname:"youtube.com"},
-            ];
-    ipc.send('batchAddHostRecords',hostrecordsToAdd);
-    
-    
-    const hostrecordsToAdd_host = [];
-    
-    // 配置host
-    host_dataArray.forEach(service => {
-        console.log('配置的host',service);
-        hostrecordsToAdd_host.push({ ip: '127.114.233.8', hostname: service });
-    });
-    
-    ipc.send('batchAddHostRecords',hostrecordsToAdd_host);
-    
-    ipc.send('high_priority', "sniproxy.exe");
-}
-
 
 
 
@@ -1491,8 +1210,8 @@ function my_set_page(){
 
 function Logout(){
     stop_speed();
-    localStorage.setItem('user_code', "");
-    $("[page='home']").trigger("click");
+    localStorage.removeItem('user_code');
+    // $("[page='home']").trigger("click");
 }
 
 function buy_time_page(){

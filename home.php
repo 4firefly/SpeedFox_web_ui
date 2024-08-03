@@ -149,7 +149,7 @@ else {
                 <!-- 平台加速 -->
                 <p class="pt_title">同时加速:</p>
                 <div class="pt_list">
-                    <div class="pt_box" onclick="net_speed()">
+                    <div class="pt_box" onclick="ShowHostPopup()">
                         <i class="layui-icon layui-icon-add-1" style="position: relative;top: 4px;left: -3px;font-size: 24px;margin-left: 0px;"></i> 
                     </div>
                 </div>

@@ -28,6 +28,13 @@ class SFApi {
   getToken () {
     return localStorage.getItem('user_code');
   }
+  isVaildLogin () {
+    let res = Api.getUserInfo();
+    if (res.response == "ERR") {
+      return false;
+    }
+    return true;
+  }
   getUserInfo() {
     let res = this._getJSON(
       `${this.host}/api/v2/?mode=user_info`,

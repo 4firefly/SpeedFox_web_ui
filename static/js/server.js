@@ -9,7 +9,7 @@ let serverConnectionConfig = []; // 服务器连接信息
 
 function CheckandPopupServerList(id, mode) {
   // 检测有没有登录
-  if (!UpdateUserInfo()) {
+  if (!Api.isVaildLogin()) {
       console.log("账号未登录");
       ShowLoginPopup();
       return; 
@@ -107,8 +107,8 @@ function ShowChooseServerPopup(gameid) {
       let modeValue = selectedOption.attr('mode');
       if (modeValue) {
           console.log("Selected mode: " + modeValue);
-          serverConnectionConfig.mode = modeValue
-          localStorage.setItem('speed_mode_' + currentGameSpeedConfig.id, serverConnectionConfig.mode);
+          serverConnectionConfig.speedMode = modeValue
+          localStorage.setItem('speed_mode_' + currentGameSpeedConfig.id, serverConnectionConfig.speedMode);
           
       } else {
           console.log("No option selected");
@@ -324,7 +324,7 @@ function renderServerList() {
         serverConnectionConfig = data;
         let modeValue = $('input[name="mode_set_name"]:checked').attr('mode');
         if (modeValue) {
-            serverConnectionConfig.mode = modeValue
+            serverConnectionConfig.speedMode = modeValue
         }
         obj.setRowChecked({
           type: 'radio'

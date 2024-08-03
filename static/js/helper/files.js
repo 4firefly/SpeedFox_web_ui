@@ -3,5 +3,5 @@
 * url: 需要打开的 url
 * */
 function open_url(url) {
-  shell.openExternal(url);
+  ipc.send('openurl', url);
 }
