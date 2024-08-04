@@ -16,11 +16,8 @@ function CheckandPopupServerList(id, mode) {
   }
 
   // 检测有没有游戏在加速
-  if(currentGameID != 0){
-      // layer.msg('有其他游戏正在加速！');
-      console.log("其他游戏已经正在加速",currentGameID);
-      // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <marquee scrollamount='10'>正在加速其他游戏！&nbsp;&nbsp;&nbsp;&nbsp;</marquee>"});
-      
+  if (nCurrentSpeedGameID != 0) {
+      layer.msg('有其他游戏正在加速！');
       $("[page='home']").trigger("click");
       return; 
   }
@@ -34,7 +31,7 @@ function CheckandPopupServerList(id, mode) {
   addGameHistory(id);
 
   // 在列表加速
-  if(mode == 2){
+  if (mode == 2) {
       LoadGameHistory();
       $("[page='home']").trigger("click");
   }
@@ -103,9 +100,9 @@ function ShowChooseServerPopup(gameid) {
               </div>
           </div>`,
       end: function () {
-          console.log('服务器列表弹层已被移除');
-          window.clearInterval(LatencyTestInterval);
-          window.clearInterval(LatencyTestTimeout);
+            console.log('服务器列表弹层已被移除');
+            window.clearInterval(LatencyTestInterval);
+            window.clearInterval(LatencyTestTimeout);
           }
       });
   
@@ -115,17 +112,14 @@ function ShowChooseServerPopup(gameid) {
       let modeValue = selectedOption.attr('mode');
       if (modeValue) {
           console.log("Selected mode: " + modeValue);
-          serverConnectionConfig.speedMode = modeValue
-          localStorage.setItem('speed_mode_' + currentGameSpeedConfig.id, serverConnectionConfig.speedMode);
-          
+          serverConnectionConfig.speedMode = modeValue;
       } else {
           console.log("No option selected");
       }
   })
-  
-  // 重新渲染按钮
+
   layui.form.render();
-  
+
   currentRegionServerList = null; // 清空列表
   serverDelayData = []; // 清空测试历史延迟
   window.clearInterval(LatencyTestInterval);
@@ -153,13 +147,12 @@ function ShowChooseServerPopup(gameid) {
   $(".all_server").html("");
   
   if(currentGameSpeedConfig.Server_CountryCode == "" || currentGameSpeedConfig.Server_CountryCode == null){
-      layer.msg('此游戏暂无服务器');
+      layer.msg('此游戏暂无可用区服');
       return; 
   }
   let currentGameServerRegions = Api.getServerRegions();
   let Server_CountryCode_arry = currentGameSpeedConfig.Server_CountryCode.split(',')
   $.each(Server_CountryCode_arry, function(i, field_CountryCode) {
-      console.log("地区" , field_CountryCode);
       $.each(currentGameServerRegions, function(i, field){
           if (field_CountryCode != field.CountryCode) {
               return; 
@@ -167,14 +160,13 @@ function ShowChooseServerPopup(gameid) {
           $(".all_server").append(`
               <button type="button" class="layui-btn layui-btn-normal" id="server_sort_${field.id}" onclick="getRegionServerList('${field.CountryCode}');"><img src="static/img/Flag/${field.Flag.toLowerCase()}.png" class="Flag"><p>${field.name}</p></button>
           `);
-      })
-      
-  })
+      });
+  });
   // 上次选择的区服
-  let last_time_region = localStorage.getItem('server_sort_' + gameid);
-  if(last_time_region){
+  let last_time_region = localStorage.getItem('last_time_region_' + (gameid + ""));
+  if (last_time_region) {
       console.log("上次选择的服务器" , last_time_region);
-      getRegionServerList(last_time_region)
+      getRegionServerList(last_time_region);
   }
 
   if (currentGameSpeedConfig.nf2_config) {
@@ -185,10 +177,9 @@ function ShowChooseServerPopup(gameid) {
   }
 
   // 读取用户选择的模式
-  let last_time_mode = localStorage.getItem('speed_mode_' + gameid);
-  console.log("上次选择的模式",last_time_mode); 
-  
-  if(last_time_mode == "" || last_time_mode == null) {
+  let last_time_mode = localStorage.getItem('last_time_mode_' + gameid);
+
+  if(!last_time_mode) {
       $('.mode_set [mode="nf2_start"]').trigger("click");
       $('.mode_set [mode="wintun_start"]').trigger("click");
   } else {
@@ -210,9 +201,9 @@ function getRegionServerList(sort) {
   $(".server_list .tablelist").hide()
   $(".server_list .serverload").show()
   currentRegionServerList = null; // 清空列表
-  serverDelayData = [] // 清空测试历史延迟
-  serverConnectionConfig = [] // 清除连接历史
-  renderServerList()// 渲染列表
+  serverDelayData = []; // 清空测试历史延迟
+  serverConnectionConfig = []; // 清除连接历史
+  renderServerList(); // 渲染列表
   try {
       currentRegionServerList = Api.getRegionServers(sort);
       console.log(currentRegionServerList);
@@ -222,7 +213,7 @@ function getRegionServerList(sort) {
   }
   $("[page='server_list']").trigger("click");
   if (!currentRegionServerList) {
-      layer.msg('节点配置错误,请联系管理员');
+      layer.msg('当前地区服务器为空!');
       $("[page='server_sort']").trigger("click");
       return; 
   }
@@ -250,8 +241,7 @@ function getRegionServerList(sort) {
           </div>`;
       }
   });
-  
-  
+
   renderServerList(); // 渲染列表
   $(".server_list_page_body load").show();
 
@@ -278,14 +268,14 @@ function getRegionServerList(sort) {
       if ($('.server_ms').text().trim() === "测速中") {
           $('.server_ms').text("状态未知");
       }
-      window.clearInterval(LatencyTestInterval)  // 去除定时器
-      window.clearInterval(LatencyTestTimeout)  // 去除定时器
+      window.clearInterval(LatencyTestInterval);  // 去除定时器
+      window.clearInterval(LatencyTestTimeout);  // 去除定时器
       console.log('Cleared All Unfinished Latency Test Timers.');
   }, 1000 * 16);
   
   // 整的差不多了，等1s 刷新列表
   setTimeout(function() {
-      renderServerList()// 渲染列表
+      renderServerList();
       $(".server_list .tablelist").show();
       $(".server_list_page_body load").hide();
   }, 1000 * 1);
@@ -297,7 +287,7 @@ function getRegionServerList(sort) {
 function renderServerList() {
 
   // 渲染数据
-  layui.use('table', function(){
+  layui.use('table', function() {
     let table = layui.table;
     
     // 已知数据渲染

@@ -320,8 +320,9 @@
         <script src="static/js/jquery-3.7.1.min.js"></script>
         <!--<script src="static/js/pinyin.js"></script><!-- 拼音 -->
         <script>
+            'use strict';
             // oem_js
-        <? echo $productdata["oem_js"]?>
+            <? echo $productdata["oem_js"]?>
         </script>
         <script src="static/js/helper/api.js?<?echo $debug;?>"></script>
         <script src="static/js/helper/listeners.js?<?echo $debug;?>"></script>

@@ -160,7 +160,6 @@ $(".stop_speed_hover_jq").hover(function() {
   $(".stop_speed").css("opacity", 1);
 });
 $(".start_game .box .server_info .udp_ico").on('click', function(event) {
-  socksTestResult = [];
   ipc.send('socks_connect_test');
 });
 // 启动游戏

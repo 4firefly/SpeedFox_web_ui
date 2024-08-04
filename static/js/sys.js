@@ -343,7 +343,7 @@ function generateUniqueID() {
 
 // 写入游戏配置+服务器配置
 
-var Server_config
+
 
 var speed_code_test_mode = 0
 ipc.on('speed_code_test', (event, message) => {
@@ -515,7 +515,7 @@ function error_page(data) {
   layer.msg('正在抓取错误...', {
     icon: 16,
     shade: 0.01
-  });;
+  });
   ipc.send('web_log',
     `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`
     );
@@ -532,34 +532,7 @@ function error_page(data) {
     `[出现错误] #=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#=-=#`
     );
 
-  stop_speed()
-  // setTimeout(() => {
-  //     $(".app_page").hide();
-  //     $(".error_page").show();
-
-  //     $(".error_title").html(data);
-  //     var textarea = document.getElementById('error_log');
-  //     textarea.scrollTop = textarea.scrollHeight;
-
-  //     // // 准备验证码
-  //     // $('.error_captcha').captcha({
-  //     //   clicks: 3,
-  //     //   url: '/apps/captcha2/captcha.php',
-  //     //   tip: '请按照顺序依次点击图中的',
-  //     //   callback: function(){
-  //     //     // alert('表单提交');
-  //     //     console.log($(".error_captcha input[name='captcha']").val())
-  //     //   },
-  //     // });
-
-  //     // setTimeout(() => {
-  //     //     var r=confirm("您是否愿意吧错误日志提交给我们，这样我们会更好的优化客户端");
-  //     //     if (r==true){
-  //     //         $(".error_log_captcha_submit").click()
-  //     //     }
-  //     // }, 1000);
-
-  // }, 1000 * 3);
+  stop_speed();
 }
 
 // 下载文件
@@ -796,7 +769,7 @@ function app_fix(css) {
   }
 
   // 检测有没有游戏在加速
-  if (currentGameID != 0) {
+  if (nCurrentSpeedGameID != 0) {
     layer.msg('有其他游戏正在加速！\n无法修复！');
     return;
   }

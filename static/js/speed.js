@@ -1,8 +1,12 @@
-let currentGameID = 0;
+let nCurrentSpeedGameID = 0;
+let Server_config;
 let isSocksReady = false;
+let socksTestResult = {
+  'tcp': false,
+  'udp': false
+};
 let UploadUserBDTimer = 5;
 let GameStartSpeedTimer;
-let socksTestResult = [];
 let HostSpeedList;
 ipc.on('speed_code', (event, message) => {
   console.log('主线程发送信息:', message);
@@ -13,24 +17,24 @@ ipc.on('speed_code', (event, message) => {
       speed_session_id = generateUniqueID();
       StartMonitor();
       ShowSpeedInfo();
-      console.log('加速成功,跳转页面:', currentGameID);
+      console.log('加速成功,跳转页面:', nCurrentSpeedGameID);
 
       // 上升优先级
-      ipc.send('high_priority', "sniproxy.exe");
+      ipc.send('high_priority', "core.exe");
       ipc.send('high_priority', "SpeedNet.exe");
       ipc.send('high_priority', "SpeedProxy.exe");
       ipc.send('high_priority', "SpeedMains.exe");
       ipc.send('high_priority', "SpeedFox.tun2socks.exe");
 
       // 遮罩 实时延时
-      $("[start_gameid='"+currentGameID +"']").show();
-      $("[game_now_starting_id='"+currentGameID +"']").hide();
-      $("[game_now_starting_id='"+currentGameID +"'] iframe").prop('src', '');
+      $("[start_gameid='"+nCurrentSpeedGameID +"']").show();
+      $("[game_now_starting_id='"+nCurrentSpeedGameID +"']").hide();
+      $("[game_now_starting_id='"+nCurrentSpeedGameID +"'] iframe").prop('src', '');
 
       // host 加速
       if (currentGameSpeedConfig.config_host.includes("**")) {
           let SpeedHostArr = currentGameSpeedConfig.config_host.split("\r\n");
-          for (var i = 0; i < SpeedHostArr.length; i++) {
+          for (let i = 0; i < SpeedHostArr.length; i++) {
               let currPlatflorm = SpeedHostArr[i].replaceAll("*","");
               console.log('检测到需要加速的平台', currPlatflorm);
               SpeedHost(currPlatflorm, 1);
@@ -43,14 +47,14 @@ ipc.on('speed_code', (event, message) => {
       console.log('来自host模块的socks测试 - 成功！');
       $(".start_game .box .pt_list .pt_box .layui-icon").hide();
       RenderHostPopup();
-      layer.close(net_speed_layui_box);
+      layer.close(HostSpeedPopup);
   }
-  if(message.start == "SOCKS ERR") {
+  if (message.start == "SOCKS ERR") {
       clearTimeout(GameStartSpeedTimer);
       stop_speed();
-      var r = confirm("当前服务器不可用,请尝试更换其他服务器\n\n\n服务器链接失败，要查看日志么?");
-      if (r == true) {
-          error_page("服务器检测连通性失败")
+      let req = confirm("当前服务器不可用,请尝试更换其他服务器\n\n\n服务器链接失败，要查看日志么?");
+      if (req == true) {
+          error_page("服务器检测连通性失败");
       }
       return;
   }
@@ -60,18 +64,16 @@ ipc.on('speed_code', (event, message) => {
       return;
   }
 
-  if(message.id == "SpeedProxy_OK"){
+  if (message.id == "Tunnel_OK") {
     if (!isSocksReady) {
-          updateConnectionStatusIcon();
-          socksTestResult = [];
           ipc.send('speed_code_config', {"mode" : "socks_startup_check"});
           ipc.send('socks_connect_test'); // update icon
     }
-    
+
   }
 
   if (message.start == "close") {
-      if (currentGameID == 0) {
+      if (nCurrentSpeedGameID == 0) {
           // 正常停
           console.log('进程停止(正常)');
           return;
@@ -82,29 +84,25 @@ ipc.on('speed_code', (event, message) => {
 });
 
 ipc.on('socks_connect_test', (event, message) => {
-    console.log(`连接检测 `, message)
-  
+    console.log(`连接检测 `, message);
+    if (message.includes("TCP: OK")) {
+      socksTestResult.tcp = true;
+    }
     if (message.includes("UDP: OK")) {
-      layer.msg('UDP 连接正常', {
-        offset: 'b',
-        anim: 'slideUp'
-      });
-      ipc.send('web_log', `UDP 连接正常 `);
       socksTestResult.udp = true;
     }
-    if (message.includes("TCP: OK")) {
-      layer.msg('TCP 连接正常', {
+    if (socksTestResult.tcp && socksTestResult.udp) {
+      layer.msg('连接测试正常', {
         offset: 'b',
         anim: 'slideUp'
       });
-      ipc.send('web_log', `TCP 连接正常 `);
-      socksTestResult.TCP = true;
+      $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
+      $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
     }
-    updateConnectionStatusIcon();
-  });
+});
 
 function startSpeedUp() {
-    if (serverConnectionConfig.id == "" || serverConnectionConfig.id == undefined) {
+    if (!serverConnectionConfig.id) {
         layer.msg('未选择服务器');
         return; 
     }
@@ -112,29 +110,29 @@ function startSpeedUp() {
     HostSpeedList.forEach(service => {
         service.start = 0;
     });
-    sendGameConfig(currentGameSpeedConfig.id, serverConnectionConfig.id, serverConnectionConfig.speedMode);
+    sendGameConfig(currentGameSpeedConfig.id);
   }
 
-  function sendGameConfig(gameid, serverid, speedMode) {
+  function sendGameConfig(gameid) {
+    let speedMode = serverConnectionConfig.speedMode;
     layer.close(oChooseServerPopup);// 关闭服务器列表弹层
 
-    Server_config = null;
     $("[game_now_starting_id='"+gameid+"']").show();
     // ???
     let Game_start_iframe = "page/load/";
     $("[game_now_starting_id='"+gameid+"'] iframe").prop('src', Game_start_iframe);
-    currentGameID = gameid;
+    nCurrentSpeedGameID = gameid;
     updateGameStartAnim(1);
-
 
     GameStartSpeedTimer = setTimeout(function() {
         stop_speed();
         error_page("加速超时");
     }, 1000 * 16);
 
-    Server_config = Api.getServerConfig(serverid)
+    Server_config = Api.getServerConfig(serverConnectionConfig.id);
 
-    localStorage.setItem('server_sort_' + currentGameSpeedConfig.id, Server_config.CountryCode);
+    localStorage.setItem('last_time_region_' + currentGameSpeedConfig.id, Server_config.CountryCode);
+    localStorage.setItem('last_time_mode_' + currentGameSpeedConfig.id, serverConnectionConfig.speedMode);
     let v2config = '';
     if (serverConnectionConfig.code_mod == "v2ray") {
         v2config = buildV2Config(Server_config);
@@ -144,10 +142,11 @@ function startSpeedUp() {
         "Server_config" : Server_config,
         "mode": speedMode,
         "code_mod": serverConnectionConfig.code_mod,
+        "core_type": serverConnectionConfig.code_mod,
         "v2config": v2config
     };
     isSocksReady = false;
-    ipc.send('speed_code_config', SpeedCfg);
+    ipc.send('startSpeed', SpeedCfg);
     let gamebg = "";
     if (currentGameSpeedConfig.wallpapers == "noset") {
         gamebg = `${Api.host}/up_img/${currentGameSpeedConfig.img}.webp`;
@@ -176,14 +175,6 @@ function startSpeedUp() {
         speed_mod = "路由模式";
     }
     $('.start_game .box .server_info p').text(Server_config.name + "-" + Server_config.id + " | " + speed_mod);
-}
-
-function updateConnectionStatusIcon() {
-  if (socksTestResult.TCP && socksTestResult.udp) {
-      $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettestok.png');
-  }else{
-      $('.start_game .box .server_info .udp_ico').attr('src', API_SERVER_ADDRESS+'/app_ui/pc/static/img/nettesterr.png');
-  }
 }
 
 function buildV2Config (Server_config) {
@@ -232,8 +223,8 @@ function stop_speed() {
     console.log(`停止加速 `)
     ipc.send('speed_code_config', { "mode": "taskkill" });
   
-    $("[start_gameid='" + currentGameID + "']").hide();
-    currentGameID = 0
+    $("[start_gameid='" + nCurrentSpeedGameID + "']").hide();
+    nCurrentSpeedGameID = 0
   
     start_speed_time = $('.start_game .box .stop_speed time').text();
     // ipcRenderer.send('speed_tips_Window', {"url" : "https://api.jihujiasuqi.com/app_ui/pc/page/tips/tips.php?text= <p style='position: fixed;top: -34px;'>已停止加速！</p> <p style='position: absolute;top: 10px;font-size: 12px;'>加速时长:" + start_speed_time + "</p>"});
@@ -350,9 +341,9 @@ function updateHosts() {
   ipc.send('high_priority', "sniproxy.exe");
 }
 
-let net_speed_layui_box;
+let HostSpeedPopup;
 function ShowHostPopup(){
-    net_speed_layui_box = layer.open({
+    HostSpeedPopup = layer.open({
         type: 1,
         shadeClose: true,
         shade: 0.8,
@@ -367,7 +358,6 @@ function ShowHostPopup(){
                 </div>
             </div>
     `,end: function(){
-    console.log('平台加速页面已移除');
   }
     });
     

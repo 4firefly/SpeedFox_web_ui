@@ -4,7 +4,7 @@ function UpdateUserInfo() {
       localStorage.removeItem('user_code');
       $('.my_user .username').text("未登录");
       $('.my_user .UID').text("未登录");
-      if (currentGameID + 0  != 0) {
+      if (nCurrentSpeedGameID + 0  != 0) {
           stop_speed();
       }
     return;
